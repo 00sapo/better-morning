@@ -3,7 +3,7 @@
 
 # 🌅 Better Morning
 
-**Better Morning** is an automated news digest system that fetches articles from user-defined RSS feeds, summarizes them using a Language Model (LLM) of your choice, and delivers a personalized news summary daily.
+**Better Morning** is an automated news digest system that fetches articles from user-defined RSS feeds, summarizes them using a Language Model (LLM) of your choice, and delivers a personalized news summary periodically (e.g. daily).
 
 ## ✨ Features
 
@@ -26,16 +26,7 @@ git clone https://github.com/your-username/better-morning.git
 cd better-morning
 ```
 
-### 2. Install Dependencies
-
-This project uses `uv` as the package manager for speed and efficiency.
-
-```bash
-pip install uv
-uv sync
-```
-
-### 3. Configure Global Settings (`config.toml`)
+### 2. Configure Global Settings (`config.toml`)
 
 Create a `config.toml` file in the root of your repository (if it doesn't already exist) to define global settings. This file specifies defaults and sensitive environment variable names.
 
@@ -70,7 +61,7 @@ github_token_env = "GITHUB_TOKEN" # Default GitHub token env var (usually provid
 # recipient_email = "your_email@example.com"
 ```
 
-### 4. Define RSS Feed Collections (`collections/*.toml`)
+### 3. Define RSS Feed Collections (`collections/*.toml`)
 
 Create TOML files in the `collections/` directory to define your news categories. Each file represents a collection and can override global settings. A `default_news.toml` is provided as an example.
 
@@ -104,7 +95,43 @@ parser_type = "html.parser"
 collection_prompt = "Provide a comprehensive but concise overview of the most significant global news from various sources."
 ```
 
-### 5. Run Locally
+### 4. Set Up GitHub Secrets
+
+For the GitHub Action to function, you need to configure secrets in your repository settings.
+
+1. Go to your GitHub repository.
+2. Navigate to `Settings` -> `Secrets and variables` -> `Actions`.
+3. Click `New repository secret` for each of the following:
+
+    - `BETTER_MORNING_LLM_API_KEY`: Your API key for the chosen LLM provider (e.g., OpenAI API Key). **Required**.
+    - `BETTER_MORNING_SMTP_USERNAME`: (Optional, if using email output) Your SMTP username/email address.
+    - `BETTER_MORNING_SMTP_PASSWORD`: (Optional, if using email output) Your SMTP password or app-specific password.
+    - `GITHUB_TOKEN`: This is automatically provided by GitHub Actions for creating releases, so you generally don't need to set it manually unless you need extended permissions. Ensure your repository's `Settings > Actions > General > Workflow permissions` are set appropriately (e.g., `Read and write permissions`).
+
+## ⚙️ GitHub Action
+
+The `.github/workflows/daily_digest.yml` file defines the GitHub Action that runs your daily digest generation.
+
+- **Trigger**: It's set to run daily at 00:00 UTC and can also be triggered manually via `workflow_dispatch`.
+- **Steps**: It checks out your code, sets up Python with `uv`, installs dependencies, and executes `src/main.py`.
+
+## 📝 Output Options
+
+Based on your `output_type` in `config.toml`:
+
+- **GitHub Release**: A new GitHub Release will be created daily with the digest content. The release will be tagged with `daily-digest-YYYY-MM-DD`.
+- **Email**: The digest will be sent to the `recipient_email` specified in your `config.toml`.
+
+## Run Locally
+
+#### Install Dependencies
+
+This project uses `uv` as the package manager for speed and efficiency.
+
+```bash
+pip install uv
+uv sync
+```
 
 To test the digest generation locally without deploying to GitHub Actions, you can use the `run_local.py` script. This script sets up dummy environment variables where needed and executes the main application logic. If GitHub or email output is configured but secrets are not fully set, the digest will be saved to a local Markdown file.
 
@@ -118,33 +145,6 @@ To test the digest generation locally without deploying to GitHub Actions, you c
 export BETTER_MORNING_LLM_API_KEY="sk-your-llm-api-key"
 ./.venv/bin/python run_local.py
 ```
-
-### 6. Set Up GitHub Secrets
-
-For the GitHub Action to function, you need to configure secrets in your repository settings.
-
-1.  Go to your GitHub repository.
-2.  Navigate to `Settings` -> `Secrets and variables` -> `Actions`.
-3.  Click `New repository secret` for each of the following:
-
-    -   `BETTER_MORNING_LLM_API_KEY`: Your API key for the chosen LLM provider (e.g., OpenAI API Key). **Required**.
-    -   `BETTER_MORNING_SMTP_USERNAME`: (Optional, if using email output) Your SMTP username/email address.
-    -   `BETTER_MORNING_SMTP_PASSWORD`: (Optional, if using email output) Your SMTP password or app-specific password.
-    -   `GITHUB_TOKEN`: This is automatically provided by GitHub Actions for creating releases, so you generally don't need to set it manually unless you need extended permissions. Ensure your repository's `Settings > Actions > General > Workflow permissions` are set appropriately (e.g., `Read and write permissions`).
-
-## ⚙️ GitHub Action
-
-The `.github/workflows/daily_digest.yml` file defines the GitHub Action that runs your daily digest generation.
-
--   **Trigger**: It's set to run daily at 00:00 UTC and can also be triggered manually via `workflow_dispatch`.
--   **Steps**: It checks out your code, sets up Python with `uv`, installs dependencies, and executes `src/main.py`.
-
-## 📝 Output Options
-
-Based on your `output_type` in `config.toml`:
-
--   **GitHub Release**: A new GitHub Release will be created daily with the digest content. The release will be tagged with `daily-digest-YYYY-MM-DD`.
--   **Email**: The digest will be sent to the `recipient_email` specified in your `config.toml`.
 
 ## 🤝 Contributing
 
