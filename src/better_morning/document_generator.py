@@ -4,7 +4,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Dict, List
 from datetime import datetime
-import os
+import markdown2
 
 from .config import OutputSettings, GlobalConfig, get_secret
 from .rss_fetcher import Article  # Still needed for type hinting potentially elsewhere
@@ -47,13 +47,18 @@ class DocumentGenerator:
                 self.output_settings.smtp_password_env, "SMTP Password"
             )
 
-            msg = MIMEMultipart()
+            # Convert the Markdown body to HTML
+            html_body = markdown2.markdown(body)
+
+            # Create a multipart message with 'alternative' subtype
+            msg = MIMEMultipart("alternative")
             msg["From"] = smtp_username
             msg["To"] = recipient_email
             msg["Subject"] = subject
 
-            # Attach the body content to the email
-            msg.attach(MIMEText(body, 'plain'))
+            # Attach both the plain text (original markdown) and HTML parts
+            msg.attach(MIMEText(body, "plain"))
+            msg.attach(MIMEText(html_body, "html"))
 
             with smtplib.SMTP_SSL(
                 self.output_settings.smtp_server, self.output_settings.smtp_port

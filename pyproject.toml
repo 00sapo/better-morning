@@ -8,6 +8,7 @@ dependencies = [
   "beautifulsoup4>=4.14.0",
   "feedparser>=6.0.12",
   "litellm>=1.77.5",
+  "markdown2>=2.5.4",
   "pydantic>=2.11.9",
   "python-magic>=0.4.27",
   "requests>=2.32.5",
