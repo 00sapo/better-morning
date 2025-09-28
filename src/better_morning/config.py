@@ -11,6 +11,7 @@ class LLMSettings(BaseModel):
     n_most_important_news: int = 5
     k_words_each_summary: int = 100
     prompt_template: Optional[str] = None  # Collection-specific prompt or for filtering
+    output_language: str = "english"  # Added language setting
     api_key: Optional[str] = None  # To hold the resolved API key
 
 
@@ -48,7 +49,7 @@ class GlobalConfig(BaseModel):
 class RSSFeed(BaseModel):
     url: HttpUrl
     name: Optional[str] = None  # Name is optional now
-    max_articles: Optional[int] = None # Max articles to fetch from this feed
+    max_articles: Optional[int] = None  # Max articles to fetch from this feed
 
 
 # --- Collection-specific overrides (for parsing TOML) ---

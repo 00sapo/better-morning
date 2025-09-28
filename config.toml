@@ -4,6 +4,7 @@ model = "gemini/gemini-2.5-flash-lite"
 temperature = 0.5
 n_most_important_news = 3
 k_words_each_summary = 50
+output_language = "italian"
 prompt_template = """Summarize the following article, focusing on the key facts and insights, in exactly {k_words_each_summary} words:
 
 Title: {title}
