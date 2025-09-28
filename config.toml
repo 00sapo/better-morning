@@ -1,23 +1,22 @@
-
 [llm_settings]
 model = "gemini/gemini-2.5-flash-lite"
 temperature = 0.5
-n_most_important_news = 3
-k_words_each_summary = 50
+n_most_important_news = 10
+k_words_each_summary = 200
 output_language = "italian"
-prompt_template = """Summarize the following article, focusing on the key facts and insights, in exactly {k_words_each_summary} words:
+prompt_template = """Riassumi il seguente articolo mantendo includendo i fatti e le opinioni chiave, in esattamente {k_words_each_summary} parole:
 
-Title: {title}
-Content: {content}
+Titolo: {title}
+Contenuto: {content}
 
-Summary:"""
+Riassunto in italiano:"""
 
 [content_extraction_settings]
-follow_article_links = false
+follow_article_links = true
 parser_type = "html.parser"
 
 [output_settings]
-output_type = "github_release"                     # Options: "github_release", "email"
+output_type = "email"                              # Options: "github_release", "email"
 github_repo_slug_env = "GITHUB_REPOSITORY"
 github_token_env = "BETTER_MORNING_GITHUB_TOKEN"
 recipient_email = "your_email@example.com"         # Required if output_type is "email"

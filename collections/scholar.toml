@@ -1,0 +1,16 @@
+name = "Google Scholar"
+
+[[feeds]]
+url = "https://kill-the-newsletter.com/feeds/u1qj9xi4h8i0ka4g2qo0.xml"
+name = "Google Scholar Alerts"
+max_articles = 30
+
+[llm_settings]
+n_most_important_news = 30
+k_words_each_summary = 150
+
+[content_extraction_settings]
+follow_article_links = true
+parser_type = "html.parser"
+
+collection_prompt = "Crea una panoramica completa ma concisa degli articoli scientifici e delle ricerche presentate in questi articoli."
