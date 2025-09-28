@@ -69,37 +69,54 @@ github_token_env = "GITHUB_TOKEN" # Default GitHub token env var (usually provid
 
 ### 4. Define RSS Feed Collections (`collections/*.toml`)
 
-Create TOML files in the `collections/` directory to define your news categories. Each file represents a collection and can override global settings.
+Create TOML files in the `collections/` directory to define your news categories. Each file represents a collection and can override global settings. A `default_news.toml` is provided as an example.
 
-**Example `collections/tech_news.toml`:**
+**Example `collections/default_news.toml`:**
 
 ```toml
-# filepath: collections/tech_news.toml
-name = "Tech News Digest"
+# filepath: collections/default_news.toml
+name = "General Daily News"
 
 [[feeds]]
-url = "https://www.theverge.com/rss/index.xml"
-name = "The Verge"
+url = "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
+name = "New York Times"
 
 [[feeds]]
-url = "https://techcrunch.com/feed/"
-name = "TechCrunch"
+url = "https://www.theguardian.com/uk/rss"
+name = "The Guardian"
 
-# Override global LLM settings for this collection
+[[feeds]]
+url = "https://www.bbc.com/news/rss/newsonline_world_edition/front_page/rss.xml"
+name = "BBC World News"
+
 [llm_settings]
-n_most_important_news = 3
-k_words_each_summary = 75
-prompt_template = "Summarize this tech article: {title}. Focus on AI and gadgets. Content: {content}"
+n_most_important_news = 5
+k_words_each_summary = 100
+prompt_template = "Summarize this news article for a general audience: {title}. Content: {content}"
 
-# Override global content extraction settings for this collection
 [content_extraction_settings]
 follow_article_links = true
+parser_type = "html.parser"
 
-# Collection-specific prompt for overall summarization
-collection_prompt = "Generate a concise summary of the most important tech news focusing on AI breakthroughs and new hardware announcements."
+collection_prompt = "Provide a comprehensive but concise overview of the most significant global news from various sources."
 ```
 
-### 5. Set Up GitHub Secrets
+### 5. Run Locally
+
+To test the digest generation locally without deploying to GitHub Actions, you can use the `run_local.py` script. This script sets up dummy environment variables where needed and executes the main application logic. If GitHub or email output is configured but secrets are not fully set, the digest will be saved to a local Markdown file.
+
+```bash
+./.venv/bin/python run_local.py
+```
+
+**Note:** For local LLM summarization to work, you will need to set the `BETTER_MORNING_LLM_API_KEY` environment variable with a valid API key for your chosen LLM provider. For example:
+
+```bash
+export BETTER_MORNING_LLM_API_KEY="sk-your-llm-api-key"
+./.venv/bin/python run_local.py
+```
+
+### 6. Set Up GitHub Secrets
 
 For the GitHub Action to function, you need to configure secrets in your repository settings.
 

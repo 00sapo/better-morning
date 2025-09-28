@@ -1,27 +1,3 @@
-I want to build a github repository to create a document each day that resumes the news of the day before.
-
-The user should be able to setup a few collections of RSS urls.
-
-Every day at a certain time (decided by the user), a GitHub action is run.
-For each collection, the action will:
-
-- retrieve the XML
-- compare it with the latest one
-- select only the new articles
-- get the article content: the user should choose if using the default content or follow the article links and get the content using a web page parser
-- concatenate all the article contents and cut it at a certain token size (default: 128K)
-- if token size was exceeding the threshold, emit a warning
-- ask an LLM of user's choice to summarize the N most important news (N defined by the user, default 5) in K words each (K defaults to 100).
-- concatenate all the summaries in the collection and repeat the summarization procedure (with different options for the LLM, N, and K, but same defaults)
-- at the end, generate a document with the summaries from each collection in a release (or send them via mail, depending on the user choice)
-
-So, there should be a number of options, at the level of each collection and globally, including at least two secrets (email SMTP credentials and LLM API token).
-Ideally, each collection is defined by a text file with the options at the top, with some standardized format (e.g. toml).
-And each collection should have the option for a prompt that is appended when filtering news and asking summary.
-
-I want to use litellm to access the various LLM providers.
-Also, I want to use uv in place of pip.
-
 This document outlines the design decisions for the "better-morning" project.
 
 ## Project Goal
@@ -52,8 +28,7 @@ The goal of this project is to create a system that generates a daily news diges
 │   └── workflows/
 │       └── daily_digest.yml
 ├── collections/
-│   ├── example1.toml
-│   └── example2.toml
+│   └── default_news.toml
 ├── src/
 │   ├── better_morning/
 │   │   ├── __init__.py
@@ -65,9 +40,9 @@ The goal of this project is to create a system that generates a daily news diges
 │   └── main.py
 ├── .gitignore
 ├── pyproject.toml
-└── README.md
+├── README.md
+└── run_local.py
 ```
-
 
 ## Implementation Details
 
@@ -83,7 +58,7 @@ This module defines Pydantic models for structured configuration and provides fu
 -   **`CollectionOverrides`**: A temporary model used during TOML parsing to capture collection-specific overrides before merging with global settings.
 -   **`Collection`**: Represents a fully resolved collection configuration, merging `GlobalConfig` defaults with collection-specific overrides.
 -   **`load_global_config(path: str) -> GlobalConfig`**: Loads the global configuration from `config.toml`. It handles cases where the file might be missing by providing default `GlobalConfig` values.
--   **`load_collection(collection_path: str, global_config: GlobalConfig) -> Collection`**: Loads a collection's TOML file, merges its settings with the provided `global_config`, and returns a fully resolved `Collection` object.
+-   **`load_collection(collection_path: str, global_config: GlobalConfig) -> Collection`**: Loads a collection's TOML file (e.g., `collections/default_news.toml`), merges its settings with the provided `global_config`, and returns a fully resolved `Collection` object.
 -   **`get_secret(env_var_name: Optional[str], config_name: str) -> str`**: A utility function to retrieve secrets from environment variables, raising an error if the variable is not found or configured.
 
 ### 2. RSS Feed Fetching (`src/better_morning/rss_fetcher.py`)
@@ -146,10 +121,18 @@ This is the entry point of the application, orchestrating the entire news digest
     -   Uses `asyncio.gather` to concurrently call `process_collection` for each discovered collection, improving performance.
     -   Aggregates the summaries from all collections.
     -   Generates the `final_markdown_digest` using `DocumentGenerator`.
-    -   Based on `global_config.default_output_settings.output_type`, it either calls `document_generator.create_github_release` or `document_generator.send_via_email`. It ensures required environment variables (`GITHUB_REPOSITORY` for GitHub, recipient email and SMTP credentials for email) are present.
+    -   Based on `global_config.default_output_settings.output_type`, it either calls `document_generator.create_github_release` or `document_generator.send_via_email`. It gracefully handles missing secrets/environment variables for local runs by saving the digest to a local Markdown file if external output is not fully configured.
     -   Prints the final digest to the console.
 
-### 7. GitHub Actions Workflow (`.github/workflows/daily_digest.yml`)
+### 7. Local Execution Script (`run_local.py`)
+
+This script provides a convenient way to run the `better-morning` application locally, outside of GitHub Actions.
+
+-   Sets up dummy environment variables for `GITHUB_REPOSITORY` and `BETTER_MORNING_LLM_API_KEY` to allow the `main` function to run without immediate errors, even if real secrets are not configured. Users are prompted to replace the dummy LLM API key for functional summarization.
+-   Imports and executes the `main()` asynchronous function from `src/main.py`.
+-   Prints informative messages about local execution and potential fallback to local Markdown file output if external publishing is not fully set up.
+
+### 8. GitHub Actions Workflow (`.github/workflows/daily_digest.yml`)
 
 Automates the daily execution of the `main.py` script.
 

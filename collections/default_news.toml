@@ -1,0 +1,24 @@
+name = "General Daily News"
+
+[[feeds]]
+url = "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
+name = "New York Times"
+
+[[feeds]]
+url = "https://www.theguardian.com/uk/rss"
+name = "The Guardian"
+
+[[feeds]]
+url = "https://www.bbc.com/news/rss/newsonline_world_edition/front_page/rss.xml"
+name = "BBC World News"
+
+[llm_settings]
+n_most_important_news = 5
+k_words_each_summary = 100
+prompt_template = "Summarize this news article for a general audience: {title}. Content: {content}"
+
+[content_extraction_settings]
+follow_article_links = true
+parser_type = "html.parser"
+
+collection_prompt = "Provide a comprehensive but concise overview of the most significant global news from various sources."

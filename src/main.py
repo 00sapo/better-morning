@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List
 import asyncio
 import glob
@@ -87,19 +87,29 @@ async def main():
 
     if output_type == "github_release":
         repo_slug = os.getenv("GITHUB_REPOSITORY") # e.g., 'owner/repo' from GitHub Actions
-        if not repo_slug:
-            print("Error: GITHUB_REPOSITORY environment variable not set. Cannot create GitHub release.")
-            return
-        tag_name = f"daily-digest-{today.strftime("%Y-%m-%d")}"
-        release_name = f"Daily News Digest {today.strftime("%Y-%m-%d")}"
-        document_generator.create_github_release(tag_name, release_name, final_markdown_digest, repo_slug)
+        if not repo_slug or not os.getenv(global_config.default_output_settings.github_token_env):
+            print("\nWARNING: GITHUB_REPOSITORY or GitHub Token environment variable not set. Skipping GitHub release. If running locally, this is expected.\n")
+            # Optionally save to a local file instead for local testing
+            with open(f"daily-digest-{today.strftime("%Y-%m-%d")}.md", "w") as f:
+                f.write(final_markdown_digest)
+            print(f"Digest saved to daily-digest-{today.strftime("%Y-%m-%d")}.md")
+        else:
+            tag_name = f"daily-digest-{today.strftime("%Y-%m-%d")}"
+            release_name = f"Daily News Digest {today.strftime("%Y-%m-%d")}"
+            document_generator.create_github_release(tag_name, release_name, final_markdown_digest, repo_slug)
     elif output_type == "email":
         recipient_email = global_config.default_output_settings.recipient_email
-        if not recipient_email:
-            print("Error: Recipient email not configured for email output. Cannot send email.")
-            return
-        subject = f"Daily News Digest - {today.strftime("%Y-%m-%d")}"
-        document_generator.send_via_email(subject, final_markdown_digest, recipient_email)
+        if not recipient_email or not global_config.default_output_settings.smtp_server or \
+           not os.getenv(global_config.default_output_settings.smtp_username_env) or \
+           not os.getenv(global_config.default_output_settings.smtp_password_env):
+            print("\nWARNING: Email configuration (recipient, SMTP server, or credentials) is incomplete. Skipping email. If running locally, this is expected.\n")
+            # Optionally save to a local file instead for local testing
+            with open(f"daily-digest-{today.strftime("%Y-%m-%d")}.md", "w") as f:
+                f.write(final_markdown_digest)
+            print(f"Digest saved to daily-digest-{today.strftime("%Y-%m-%d")}.md")
+        else:
+            subject = f"Daily News Digest - {today.strftime("%Y-%m-%d")}"
+            document_generator.send_via_email(subject, final_markdown_digest, recipient_email)
     else:
         print(f"Warning: Unknown output type '{output_type}'. Digest only printed to console.")
 
