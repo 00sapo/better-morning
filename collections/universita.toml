@@ -1,0 +1,36 @@
+name = "Politica Universitaria"
+
+[[feeds]]
+url = "https://www.roars.it/feed/"
+name = "ROARS"
+max_articles = 3
+
+[[feeds]]
+url = "https://dottorato.it/rss.xml"
+name = "ADI"
+max_articles = 5
+
+[[feeds]]
+url = "https://morss.it/:items=||*[class=tgme_widget_message_text]/https://t.me/s/Mur_Telegram"
+name = "Mur Telegram"
+max_articles = 2
+
+[[feeds]]
+url = "https://corriereuniv.it/feed/"
+name = "Corriere Università"
+max_articles = 3
+
+[[feeds]]
+url = "https://www.crui.it/?format=feed&type=rss"
+name = "CRUI"
+max_articles = 2
+
+[llm_settings]
+n_most_important_news = 2
+k_words_each_summary = 150
+
+[content_extraction_settings]
+follow_article_links = true
+parser_type = "html.parser"
+
+collection_prompt = "Crea una panoramica completa ma concisa delle notizie, prospettive, e opinioni presentate in questi articoli. Presta particolare attenzione alle notizie riguardanti i post-dottorati, assegni e incarichi di ricerca, bandi per progetti di ricerca, e riforme del sistema universitario."
