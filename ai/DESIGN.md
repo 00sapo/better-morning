@@ -8,7 +8,7 @@ The goal of this project is to create a system that generates a daily news diges
 
 - **RSS Feed Collections**: Users can define multiple collections of RSS feeds.
 - **Configuration**: Each collection is configured using a TOML file.
-- **Content Extraction**: The system can extract content from the article's link, not just the RSS feed.
+- **Content Extraction**: The system can extract content from the article's link, handling both HTML pages and PDF documents.
 - **Summarization**: Summaries are generated using an LLM of the user's choice, supported by `litellm`.
 - **Automation**: The process is automated using a GitHub Action.
 - **Output**: The final digest can be published as a GitHub release or sent via email.
@@ -17,7 +17,8 @@ The goal of this project is to create a system that generates a daily news diges
 
 - **Programming Language**: Python
 - **Package Manager**: `uv`
-- **LLM Interaction**: `litellm`
+- **LLM Interaction**: `litellm` (for multimodal summarization)
+- **Content-Type Detection**: `python-magic`
 - **Configuration Format**: TOML
 
 ## Directory Structure
@@ -65,7 +66,7 @@ This module defines Pydantic models for structured configuration and provides fu
 
 This module handles fetching RSS feeds, parsing entries, and managing historical articles to identify new content.
 
--   **`Article`**: Pydantic model representing a single news article, including `id` (link used as unique ID), `title`, `link`, `published_date`, `summary` (from RSS or LLM), and `content` (full article text).
+-   **`Article`**: Pydantic model for a news article. Includes `id`, `title`, `link`, `published_date`, `summary` (from RSS or LLM), `content` (for extracted text), `raw_content` (for binary data like PDFs), and `content_type` (e.g., "application/pdf").
 -   **`ArticleEncoder`**: A custom `json.JSONEncoder` to properly serialize `datetime` and `HttpUrl` objects when saving historical articles.
 -   **`RSSFetcher`**: A class responsible for:
     -   Loading historical articles from a JSON file (e.g., `history/{collection_name}_articles.json`).
@@ -76,23 +77,28 @@ This module handles fetching RSS feeds, parsing entries, and managing historical
 
 ### 3. Content Extraction (`src/better_morning/content_extractor.py`)
 
-This module is responsible for extracting the full text content of an article, either from its RSS summary or by following the article link and parsing the webpage.
+This module is responsible for fetching content from an article's link and preparing it for summarization. It intelligently handles different content types.
 
 -   **`ContentExtractor`**: A class that:
-    -   Takes `ContentExtractionSettings` in its constructor.
-    -   **`_extract_from_html(html_content: str) -> Optional[str]`**: Parses HTML content using `BeautifulSoup` with configured `parser_type`. It attempts to locate common article content elements (`<article>`, `<main>`, specific `div` classes) and extracts text from paragraphs within them. Falls back to extracting all paragraphs if specific article containers are not found.
-    -   **`get_content(article: Article) -> Article`**: This is the main method that orchestrates content retrieval. If `follow_article_links` is `False`, it directly uses `article.summary` as `article.content`. Otherwise, it makes an HTTP request to `article.link`, fetches the HTML, and uses `_extract_from_html` to get the content. It includes error handling and falls back to `article.summary` on failure.
+        -   Initializes with `ContentExtractionSettings`.
+        -   **`get_content(article: Article) -> Article`**: The main method for content retrieval. If `follow_article_links` is `False`, it uses the RSS `summary`. Otherwise, it downloads the content from the article's link.
+        -   It uses the `python-magic` library to reliably determine the content's MIME type (e.g., `text/html`, `application/pdf`).
+        -   If the content is HTML, it uses `_extract_from_html` with `BeautifulSoup` to parse and extract the main text.
+        -   If the content is a PDF, it does *not* extract text. Instead, it stores the raw binary content of the PDF in `article.raw_content` and sets `article.content_type` to `application/pdf`.
+        -   This approach prepares the `Article` object for multimodal processing by the LLM summarizer.
 
 ### 4. LLM Summarization (`src/better_morning/llm_summarizer.py`)
 
-This module interfaces with large language models via `litellm` to summarize articles and collections of articles.
+This module interfaces with large language models via `litellm` to summarize articles. It is designed to handle multimodal inputs, allowing it to summarize both text content and PDF documents directly.
 
 -   **`TOKEN_TO_CHAR_RATIO`**: A constant for rough estimation of tokens based on character count.
 -   **`LLMSummarizer`**: A class that:
-    -   Initializes with `LLMSettings` and `GlobalConfig`, setting the LLM API key from environment variables using `get_secret`.
-    -   **`_truncate_text_to_token_limit(text: str, token_limit: int) -> tuple[str, bool]`**: Truncates text to a character limit estimated from `token_limit` to prevent exceeding LLM input constraints. Emits a warning if truncation occurs.
-    -   **`summarize_text(article: Article, prompt_override: Optional[str] = None) -> Article`**: Summarizes an individual article. It constructs a prompt using the article's title, content, and `k_words_each_summary` (from `LLMSettings`), allowing for a `prompt_override`. The prompt is truncated if necessary, and `litellm.completion` is called to get the summary, which is then assigned to `article.summary`.
-    -   **`summarize_articles_collection(articles: List[Article], collection_prompt: Optional[str] = None) -> str`**: An asynchronous method that takes a list of articles for a collection. It first ensures each new article has an individual summary (calling `summarize_text` if needed). Then, it filters for the `n_most_important_news` (based on latest published date) from the summarized articles, concatenates their summaries, and finally uses `summarize_text` again to generate an overall collection summary based on `collection_prompt`.
+        -   Initializes with `LLMSettings` and `GlobalConfig`.
+        -   **`summarize_text(article: Article, prompt_override: Optional[str] = None) -> Article`**: The core summarization method. It checks the `article.content_type` to determine how to process the content.
+        -   **For standard text content**: It constructs a text-based prompt from the article's title and content, truncates it if necessary, and calls `litellm.completion`.
+        -   **For PDF content (`application/pdf`)**: It constructs a **multimodal message** for `litellm`. This message includes a text part (e.g., "Summarize this PDF") and the raw PDF data from `article.raw_content`. This allows a capable LLM (like GPT-4o) to "read" the PDF directly.
+        -   It includes robust error handling for API calls, with specific feedback if a multimodal request fails.
+        -   **`summarize_articles_collection(articles: List[Article], collection_prompt: Optional[str] = None) -> str`**: An asynchronous method that takes a list of articles for a collection. It first ensures each new article has an individual summary (calling `summarize_text` if needed). Then, it filters for the `n_most_important_news` (based on latest published date) from the summarized articles, concatenates their summaries, and finally uses `summarize_text` again to generate an overall collection summary based on `collection_prompt`.
 
 ### 5. Document Generation and Output (`src/better_morning/document_generator.py`)
 

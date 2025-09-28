@@ -21,4 +21,4 @@ prompt_template = "Summarize this news article for a general audience: {title}. 
 follow_article_links = true
 parser_type = "html.parser"
 
-collection_prompt = "Provide a comprehensive but concise overview of the most significant global news from various sources."
+collection_prompt = "Provide a comprehensive but concise overview of the most significant global news from various sources. Put special attention on geopolitical news."

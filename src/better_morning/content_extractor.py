@@ -1,67 +1,80 @@
 import requests
 from bs4 import BeautifulSoup
 from typing import Optional, List
+import magic
 
 from .rss_fetcher import Article
 from .config import ContentExtractionSettings
+
 
 class ContentExtractor:
     def __init__(self, settings: ContentExtractionSettings):
         self.settings = settings
 
     def _extract_from_html(self, html_content: str) -> Optional[str]:
+        """Extracts textual content from HTML using BeautifulSoup."""
         soup = BeautifulSoup(html_content, self.settings.parser_type)
-
-        # Common selectors for main article content
+        # ... (existing HTML extraction logic remains the same)
         selectors = [
-            'div.article-content',
-            'div.entry-content',
-            'div.post-content',
-            'article',
-            'main',
-            '#content',
-            '.content',
-            '.story-body',
-            '.article-body',
+            "div.article-content",
+            "div.entry-content",
+            "div.post-content",
+            "article",
+            "main",
+            "#content",
+            ".content",
+            ".story-body",
+            ".article-body",
         ]
-
         for selector in selectors:
-            element = None
-            if selector.startswith('#'):
-                element = soup.find(id=selector[1:])
-            elif selector.startswith('.'):
-                element = soup.find(class_=selector[1:])
-            else:
-                element = soup.find(selector)
-
+            element = soup.select_one(selector)
             if element:
-                paragraphs = element.find_all('p')
-                text_content = '\n\n'.join([p.get_text() for p in paragraphs])
+                paragraphs = element.find_all("p")
+                text_content = "\n\n".join(p.get_text() for p in paragraphs)
                 return text_content.strip()
-
-        # Fallback: if no specific article body found, extract all paragraph text
-        all_paragraphs = soup.find_all('p')
-        text_content = '\n\n'.join([p.get_text() for p in all_paragraphs])
-        return text_content.strip() if text_content else None
+        all_paragraphs = soup.find_all("p")
+        return "\n\n".join(p.get_text() for p in all_paragraphs).strip() or None
 
     def get_content(self, article: Article) -> Article:
         if not self.settings.follow_article_links:
-            # Use RSS summary if not following links
             article.content = article.summary
             return article
 
-        # Otherwise, fetch content from the article link
         try:
-            print(f"Fetching full content for: {article.title} from {article.link}")
-            response = requests.get(str(article.link), timeout=10)
-            response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
-            article.content = self._extract_from_html(response.text)
+            print(f"Fetching content for: {article.title} from {article.link}")
+            response = requests.get(str(article.link), timeout=15)
+            response.raise_for_status()
+
+            # Use python-magic to reliably determine the content type from the response body
+            mime_type = magic.from_buffer(response.content, mime=True)
+            article.content_type = mime_type
+
+            if "application/pdf" in mime_type:
+                print(f"Identified PDF content for: {article.title}")
+                article.raw_content = response.content
+                # The text `content` field can be a short placeholder.
+                article.content = f"PDF document with title '{article.title}' is attached for summarization."
+            elif "text/html" in mime_type:
+                print(f"Identified HTML content for: {article.title}")
+                article.content = self._extract_from_html(response.text)
+            else:
+                print(
+                    f"Warning: Unsupported content type '{mime_type}' for {article.link}."
+                )
+                article.content = article.summary  # Fallback
+
+            # Fallback if extraction fails for some reason
+            if not article.content and not article.raw_content:
+                article.content = article.summary
+
             return article
         except requests.exceptions.RequestException as e:
             print(f"Error fetching article {article.link}: {e}")
-            article.content = article.summary # Fallback to summary on error
+            article.content = article.summary
             return article
         except Exception as e:
-            print(f"Error extracting content from {article.link}: {e}")
-            article.content = article.summary # Fallback to summary on error
+            print(
+                f"An unexpected error occurred during content extraction for {article.link}: {e}"
+            )
+            article.content = article.summary
             return article

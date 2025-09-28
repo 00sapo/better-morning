@@ -1,0 +1,32 @@
+
+[llm_settings]
+model = "gemini/gemini-2.5-flash-lite"
+temperature = 0.5
+n_most_important_news = 3
+k_words_each_summary = 50
+prompt_template = """Summarize the following article, focusing on the key facts and insights, in exactly {k_words_each_summary} words:
+
+Title: {title}
+Content: {content}
+
+Summary:"""
+
+[content_extraction_settings]
+follow_article_links = false
+parser_type = "html.parser"
+
+[output_settings]
+output_type = "email"                              # Options: "github_release", "email"
+github_repo_slug_env = "GITHUB_REPOSITORY"
+github_token_env = "BETTER_MORNING_GITHUB_TOKEN"
+recipient_email = "your_email@example.com"         # Required if output_type is "email"
+smtp_server = "smtp.zoho.eu"                       # Required if output_type is "email"
+smtp_port = 587                                    # Required if output_type is "email"
+smtp_username_env = "BETTER_MORNING_SMTP_USERNAME" # Required if output_type is "email"
+smtp_password_env = "BETTER_MORNING_SMTP_PASSWORD" # Required if output_type is "email"
+
+[secrets_env_names]
+llm_api_key = "BETTER_MORNING_LLM_API_KEY"
+github_token = "BETTER_MORNING_GITHUB_TOKEN"
+smtp_username = "BETTER_MORNING_SMTP_USERNAME"
+smtp_password = "BETTER_MORNING_SMTP_PASSWORD"

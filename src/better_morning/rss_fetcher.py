@@ -14,7 +14,9 @@ class Article(BaseModel):
     link: HttpUrl
     published_date: datetime
     summary: Optional[str] = None
-    content: Optional[str] = None # Full content of the article
+                                  content: Optional[str] = None  # For text-based content
+                                  raw_content: Optional[bytes] = None  # For binary content like PDFs
+                                  content_type: Optional[str] = None  # E.g., 'application/pdf'
 
 # Custom JSON encoder for datetime objects
 class ArticleEncoder(json.JSONEncoder):
