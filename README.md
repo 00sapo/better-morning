@@ -112,7 +112,7 @@ For the GitHub Action to function, you need to configure secrets in your reposit
 
 The `.github/workflows/daily_digest.yml` file defines the GitHub Action that runs your daily digest generation.
 
-- **Trigger**: It's set to run daily at 00:00 UTC and can also be triggered manually via `workflow_dispatch`.
+- **Trigger**: It's set to run daily at 07:30 UTC and can also be triggered manually via `workflow_dispatch`.
 - **Steps**: It checks out your code, sets up Python with `uv`, installs dependencies, and executes `src/main.py`.
 
 ## 📝 Output Options
