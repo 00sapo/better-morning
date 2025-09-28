@@ -10,3 +10,7 @@ wheels/
 .venv
 .python-version
 nvim_*.log
+
+# better morning 
+history
+daily-*
