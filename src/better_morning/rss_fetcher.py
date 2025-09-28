@@ -80,7 +80,14 @@ class RSSFetcher:
                 feed = feedparser.parse(
                     str(feed_config.url)
                 )  # Convert HttpUrl to string
-                for entry in feed.entries:
+                
+                # Limit the number of entries if max_articles is set for the feed
+                entries = feed.entries
+                if feed_config.max_articles is not None and feed_config.max_articles > 0:
+                    print(f"Limiting to the latest {feed_config.max_articles} articles for this feed.")
+                    entries = feed.entries[:feed_config.max_articles]
+
+                for entry in entries:
                     article_link = entry.link
                     article_id = article_link  # Using link as a unique ID for now
 

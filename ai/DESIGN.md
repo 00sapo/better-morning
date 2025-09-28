@@ -56,7 +56,7 @@ This module defines Pydantic models for structured configuration and provides fu
 -   **`ContentExtractionSettings`**: Configures how article content is extracted (whether to follow links, parser type).
 -   **`OutputSettings`**: Specifies the output method (GitHub Release or email) and related credentials/settings.
 -   **`GlobalConfig`**: Holds application-wide settings, including default LLM, content extraction, and output settings, along with environment variable names for secrets.
--   **`RSSFeed`**: A simple model to define an individual RSS feed URL and its optional name.
+-   **`RSSFeed`**: A model to define an individual RSS feed, including its `url`, optional `name`, and an optional `max_articles` limit to control how many of the latest articles are fetched.
 -   **`CollectionOverrides`**: A temporary model used during TOML parsing to capture collection-specific overrides before merging with global settings.
 -   **`Collection`**: Represents a fully resolved collection configuration, merging `GlobalConfig` defaults with collection-specific overrides.
 -   **`load_global_config(path: str) -> GlobalConfig`**: Loads the global configuration from `config.toml`. It handles cases where the file might be missing by providing default `GlobalConfig` values.
@@ -71,7 +71,7 @@ This module handles fetching RSS feeds, parsing entries, and managing historical
 -   **`ArticleEncoder`**: A custom `json.JSONEncoder` to properly serialize `datetime` and `HttpUrl` objects when saving historical articles.
 -   **`RSSFetcher`**: A class responsible for:
     -   Loading historical articles from a JSON file (e.g., `history/{collection_name}_articles.json`).
-    -   Fetching articles from configured RSS feeds using `feedparser`.
+    -   Fetching articles from configured RSS feeds using `feedparser`. It respects the `max_articles` setting on each feed to limit the number of entries processed.
     -   Comparing newly fetched articles against historical data to identify and return only new entries.
     -   Saving all fetched articles (new and existing) back to the history file to maintain state.
     -   Robust date parsing with fallbacks.

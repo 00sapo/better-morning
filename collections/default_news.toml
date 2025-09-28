@@ -3,14 +3,17 @@ name = "General Daily News"
 [[feeds]]
 url = "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
 name = "New York Times"
+max_articles = 5
 
 [[feeds]]
 url = "https://www.theguardian.com/uk/rss"
 name = "The Guardian"
+max_articles = 5
 
 [[feeds]]
 url = "https://www.bbc.com/news/rss/newsonline_world_edition/front_page/rss.xml"
 name = "BBC World News"
+max_articles = 5
 
 [llm_settings]
 n_most_important_news = 5
