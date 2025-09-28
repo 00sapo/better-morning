@@ -47,7 +47,8 @@ class LLMSummarizer:
             # The text part of the prompt can be simpler, as the main content is the PDF
             text_prompt = (
                 f"Please summarize the attached PDF document titled '{article.title}' "
-                f"in approximately {self.settings.k_words_each_summary} words."
+                f"in approximately {self.settings.k_words_each_summary} words. "
+                f"The summary must be in {self.settings.output_language}."
             )
             messages = [
                 {
@@ -84,7 +85,8 @@ class LLMSummarizer:
                 prompt = (
                     f'Please summarize the following article titled "{article.title}" in approximately '
                     f"{self.settings.k_words_each_summary} words. Focus on the most important points.\n\n"
-                    f"{article.content}"
+                    f"The summary must be in {self.settings.output_language}.\n\n"
+                    f"Article content:\n{article.content}"
                 )
 
             # Truncate prompt if it's too long
@@ -172,27 +174,32 @@ class LLMSummarizer:
         if not effectively_summarized_articles:
             return "No articles with valid summaries to process for the collection summary."
 
-        # Sort by date to get the most important news
-        effectively_summarized_articles.sort(
-            key=lambda x: x.published_date, reverse=True
-        )
-        top_n_articles = effectively_summarized_articles[
-            : self.settings.n_most_important_news
-        ]
-
-        # Concatenate summaries for the collection-level summary
+        # Concatenate all available summaries for the LLM to evaluate
         concatenated_summaries = "\n\n".join(
-            [f"Title: {art.title}\nSummary: {art.summary}" for art in top_n_articles]
+            [
+                f"Title: {art.title}\nSummary: {art.summary}"
+                for art in effectively_summarized_articles
+            ]
         )
 
         if not concatenated_summaries:
             return "No content available for collection summary."
 
-        # 2. Summarize the concatenated summaries for the collection digest
-        collection_summary_prompt = collection_prompt or (
-            f"Given the following news summaries, provide a concise overall summary for the day's digest "
-            f"in approximately {self.settings.k_words_each_summary * self.settings.n_most_important_news} words. "
-            f"Highlight the main themes and most significant events.\n\n{concatenated_summaries}"
+        # 2. Build the final prompt, ensuring the core instruction is always present.
+        # The user's custom prompt will be integrated as an additional guideline.
+        user_guideline = ""
+        if collection_prompt:
+            user_guideline = (
+                f"Additionally, please follow this specific guideline when summarizing: '{collection_prompt}'"
+            )
+
+        collection_summary_prompt = (
+            f"From the following list of article summaries, please identify the {self.settings.n_most_important_news} "
+            f"most important news stories. Then, write a cohesive and concise summary of those top stories for a daily news digest. "
+            f"The final summary should be approximately {self.settings.k_words_each_summary * self.settings.n_most_important_news} words. "
+            f"The final summary must be in {self.settings.output_language}. "
+            f"Highlight the main themes and most significant events. {user_guideline}\n\n"
+            f"Here are the summaries:\n{concatenated_summaries}"
         )
 
         # Use the new helper to summarize the concatenated text directly
