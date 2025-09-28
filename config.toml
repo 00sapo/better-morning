@@ -20,8 +20,8 @@ output_type = "email"                              # Options: "github_release", 
 github_repo_slug_env = "GITHUB_REPOSITORY"
 github_token_env = "BETTER_MORNING_GITHUB_TOKEN"
 recipient_email = "your_email@example.com"         # Required if output_type is "email"
-smtp_server = "smtp.zoho.eu"                       # Required if output_type is "email"
-smtp_port = 587                                    # Required if output_type is "email"
+smtp_server = "smtp.zoho.com"                      # Required if output_type is "email"
+smtp_port = 465                                    # Required if output_type is "email"
 smtp_username_env = "BETTER_MORNING_SMTP_USERNAME" # Required if output_type is "email"
 smtp_password_env = "BETTER_MORNING_SMTP_PASSWORD" # Required if output_type is "email"
 

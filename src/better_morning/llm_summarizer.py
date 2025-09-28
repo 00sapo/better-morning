@@ -1,9 +1,7 @@
-import os
 from typing import Optional, List
 import litellm
-from math import ceil  # For basic token estimation
 
-from .config import LLMSettings, GlobalConfig, get_secret
+from .config import LLMSettings, GlobalConfig
 from .rss_fetcher import Article
 
 # Rough estimate: 1 token = 4 characters (common for English text)
@@ -122,6 +120,33 @@ class LLMSummarizer:
                 article.summary = "[Error: Could not summarize article]"
             return article
 
+    def _summarize_text_content(
+        self, text_content: str, prompt: str, title: str = "Untitled"
+    ) -> str:
+        """Helper to summarize raw text content using the configured LLM."""
+        # Truncate prompt if it's too long
+        truncated_prompt, was_truncated = self._truncate_text_to_token_limit(
+            prompt, self.global_config.token_size_threshold
+        )
+        if was_truncated:
+            print(
+                f"Warning: Summarization prompt for text content '{title}' was truncated."
+            )
+
+        messages = [{"role": "user", "content": truncated_prompt}]
+
+        try:
+            response = litellm.completion(
+                model=self.settings.model,
+                messages=messages,
+                temperature=self.settings.temperature,
+                api_key=self.settings.api_key,
+            )
+            return response.choices[0].message.content or ""
+        except Exception as e:
+            print(f"Error summarizing text content '{title}' with LLM: {e}")
+            return f"[Error: Could not summarize text content '{title}']"
+
     async def summarize_articles_collection(
         self, articles: List[Article], collection_prompt: Optional[str] = None
     ) -> str:
@@ -160,6 +185,11 @@ class LLMSummarizer:
             [f"Title: {art.title}\nSummary: {art.summary}" for art in top_n_articles]
         )
 
+        # --- Debugging: Print concatenated summaries ---
+        print("\n--- Concatenated Summaries for Collection-Level Prompt ---")
+        print(concatenated_summaries)
+        print("----------------------------------------------------------\n")
+
         if not concatenated_summaries:
             return "No content available for collection summary."
 
@@ -170,91 +200,19 @@ class LLMSummarizer:
             f"Highlight the main themes and most significant events.\n\n{concatenated_summaries}"
         )
 
-        # Use a dummy Article object to reuse the summarization logic
-        collection_article = Article(
-            id="collection-summary-digest",
+        # Use the new helper to summarize the concatenated text directly
+        final_summary = self._summarize_text_content(
+            text_content=concatenated_summaries,
+            prompt=collection_summary_prompt,
             title="Daily Digest Collection Summary",
-            link="http://example.com/digest",  # Dummy URL
-            published_date=datetime.now(timezone.utc),
-            content=concatenated_summaries,
         )
 
-        final_collection_summary_article = self.summarize_text(
-            collection_article, prompt_override=collection_summary_prompt
-        )
+        # --- Debugging: Print final collection summary ---
+        print("\n--- Final Generated Collection Summary ---")
+        if final_summary:
+            print(final_summary)
+        else:
+            print("[Empty summary returned by LLM]")
+        print("------------------------------------------\n")
 
-        return (
-            final_collection_summary_article.summary
-            or "Could not generate collection summary."
-        )
-
-    async def summarize_articles_collection(
-        self, articles: List[Article], collection_prompt: Optional[str] = None
-    ) -> str:
-        if not articles:
-            return "No articles to summarize for this collection."
-
-        # 1. Summarize each individual article (if not already summarized or if content is new)
-        # For simplicity, we'll re-summarize or ensure summary exists for all new articles.
-        summarized_articles: List[Article] = []
-        for article in articles:
-            if (
-                not article.summary or article.content
-            ):  # If no summary or new content exists, summarize
-                summarized_articles.append(
-                    self.summarize_text(article, prompt_override=collection_prompt)
-                )
-            else:
-                summarized_articles.append(article)
-
-        # Filter out articles that couldn't be summarized or have no content
-        effectively_summarized_articles = [
-            a
-            for a in summarized_articles
-            if a.summary and a.summary != "[Error: Could not summarize article]"
-        ]
-
-        if not effectively_summarized_articles:
-            return "No articles with valid summaries to process for the collection summary."
-
-        # Sort articles by published date to get the N most important (latest as a simple heuristic)
-        effectively_summarized_articles.sort(
-            key=lambda x: x.published_date, reverse=True
-        )
-        top_n_articles = effectively_summarized_articles[
-            : self.settings.n_most_important_news
-        ]
-
-        # Concatenate summaries of the top N articles
-        concatenated_summaries = "\n\n".join(
-            [f"Title: {art.title}\nSummary: {art.summary}" for art in top_n_articles]
-        )
-
-        if not concatenated_summaries:
-            return "No content for collection summary after individual article summarization."
-
-        # 2. Summarize the concatenated summaries for the collection
-        collection_summary_prompt = collection_prompt or (
-            f"Given the following summaries of news articles, provide a concise overall summary "
-            f"in approximately {self.settings.k_words_each_summary * self.settings.n_most_important_news} words. "
-            f"Focus on the main themes and most significant news.\n\n{concatenated_summaries}"
-        )
-
-        # Create a dummy Article object for the collection summary for consistent summarization logic
-        collection_article = Article(
-            id="collection-summary",
-            title="Collection Daily Digest Summary",
-            link=HttpUrl("http://example.com/collection-summary"),  # Dummy URL
-            published_date=datetime.now(timezone.utc),
-            content=concatenated_summaries,
-            summary=None,  # Will be filled by summarize_text
-        )
-
-        final_collection_article = self.summarize_text(
-            collection_article, prompt_override=collection_summary_prompt
-        )
-        return (
-            final_collection_article.summary
-            if final_collection_article.summary
-            else "Could not generate collection summary."
-        )
+        return final_summary or "Could not generate collection summary."

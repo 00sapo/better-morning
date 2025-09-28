@@ -37,11 +37,11 @@ class GlobalConfig(BaseModel):
         "BETTER_MORNING_LLM_API_KEY"  # Default env var for LLM API token
     )
     token_size_threshold: int = 128 * 1024  # 128K tokens
-    default_llm_settings: LLMSettings = Field(default_factory=LLMSettings)
-    default_content_extraction_settings: ContentExtractionSettings = Field(
+    llm_settings: LLMSettings = Field(default_factory=LLMSettings)
+    content_extraction_settings: ContentExtractionSettings = Field(
         default_factory=ContentExtractionSettings
     )
-    default_output_settings: OutputSettings = Field(default_factory=OutputSettings)
+    output_settings: OutputSettings = Field(default_factory=OutputSettings)
 
 
 # --- RSS Feed Definition ---
@@ -118,7 +118,7 @@ def load_collection(collection_path: str, global_config: GlobalConfig) -> Collec
         resolved_llm_settings_data = LLMSettings().model_dump()
         # Layer the global config settings on top.
         resolved_llm_settings_data.update(
-            global_config.default_llm_settings.model_dump(exclude_unset=True)
+            global_config.llm_settings.model_dump(exclude_unset=True)
         )
         # Finally, layer the collection-specific settings, which take highest priority.
         if overrides.llm_settings:
@@ -145,9 +145,7 @@ def load_collection(collection_path: str, global_config: GlobalConfig) -> Collec
             ContentExtractionSettings().model_dump()
         )
         resolved_content_extraction_settings_data.update(
-            global_config.default_content_extraction_settings.model_dump(
-                exclude_unset=True
-            )
+            global_config.content_extraction_settings.model_dump(exclude_unset=True)
         )
         if overrides.content_extraction_settings:
             resolved_content_extraction_settings_data.update(

@@ -21,11 +21,17 @@ class ContentExtractor:
     def get_content(self, article: Article) -> Article:
         if not self.settings.follow_article_links:
             article.content = article.summary
+            # Ensure content_type is set for consistency, even if it's just text
+            article.content_type = "text/plain"
             return article
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
 
         try:
             print(f"Fetching content for: {article.title} from {article.link}")
-            response = requests.get(str(article.link), timeout=15)
+            response = requests.get(str(article.link), headers=headers, timeout=15)
             response.raise_for_status()
 
             # Use python-magic to reliably determine the content type from the response body
@@ -53,11 +59,11 @@ class ContentExtractor:
             return article
         except requests.exceptions.RequestException as e:
             print(f"Error fetching article {article.link}: {e}")
-            article.content = article.summary
+            article.content = None # Ensure content is None on error
             return article
         except Exception as e:
             print(
                 f"An unexpected error occurred during content extraction for {article.link}: {e}"
             )
-            article.content = article.summary
+            article.content = None # Ensure content is None on error
             return article

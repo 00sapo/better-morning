@@ -39,11 +39,17 @@ async def process_collection(collection_path: str, global_config: GlobalConfig) 
     if not articles_with_content:
         return collection_config.name, "No articles with extractable content for this collection today.\n"
 
+    print(f"Summarizing {len(articles_with_content)} articles for {collection_config.name}...")
     # 3. Summarize the collection
     collection_digest_summary = await llm_summarizer.summarize_articles_collection(
         articles_with_content, 
         collection_prompt=collection_config.collection_prompt
     )
+
+    # --- Debugging: Check the final summary for the collection ---
+    print(f"--- Start of Summary for {collection_config.name} ---")
+    print(collection_digest_summary.strip())
+    print(f"--- End of Summary for {collection_config.name} ---")
 
     return collection_config.name, collection_digest_summary
 
@@ -75,7 +81,7 @@ async def main():
 
     # 4. Generate final markdown digest
     today = datetime.now(timezone.utc)
-    document_generator = DocumentGenerator(global_config.default_output_settings, global_config)
+    document_generator = DocumentGenerator(global_config.output_settings, global_config)
     final_markdown_digest = document_generator.generate_markdown_digest(all_collection_summaries, today)
 
     print("\n--- Generated Final Daily Digest ---\n")
@@ -83,11 +89,11 @@ async def main():
     print("\n--- End of Digest ---\n")
 
     # 5. Output the digest based on global settings
-    output_type = global_config.default_output_settings.output_type
+    output_type = global_config.output_settings.output_type
 
     if output_type == "github_release":
         repo_slug = os.getenv("GITHUB_REPOSITORY") # e.g., 'owner/repo' from GitHub Actions
-        if not repo_slug or not os.getenv(global_config.default_output_settings.github_token_env):
+        if not repo_slug or not os.getenv(global_config.output_settings.github_token_env):
             print("\nWARNING: GITHUB_REPOSITORY or GitHub Token environment variable not set. Skipping GitHub release. If running locally, this is expected.\n")
             # Optionally save to a local file instead for local testing
             with open(f"daily-digest-{today.strftime("%Y-%m-%d")}.md", "w") as f:
@@ -98,10 +104,10 @@ async def main():
             release_name = f"Daily News Digest {today.strftime("%Y-%m-%d")}"
             document_generator.create_github_release(tag_name, release_name, final_markdown_digest, repo_slug)
     elif output_type == "email":
-        recipient_email = global_config.default_output_settings.recipient_email
-        if not recipient_email or not global_config.default_output_settings.smtp_server or \
-           not os.getenv(global_config.default_output_settings.smtp_username_env) or \
-           not os.getenv(global_config.default_output_settings.smtp_password_env):
+        recipient_email = global_config.output_settings.recipient_email
+        if not recipient_email or not global_config.output_settings.smtp_server or \
+           not os.getenv(global_config.output_settings.smtp_username_env) or \
+           not os.getenv(global_config.output_settings.smtp_password_env):
             print("\nWARNING: Email configuration (recipient, SMTP server, or credentials) is incomplete. Skipping email. If running locally, this is expected.\n")
             # Optionally save to a local file instead for local testing
             with open(f"daily-digest-{today.strftime("%Y-%m-%d")}.md", "w") as f:
