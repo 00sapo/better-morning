@@ -11,11 +11,13 @@ env:
   BETTER_MORNING_LLM_API_KEY: ${{ secrets.BETTER_MORNING_LLM_API_KEY }}
   BETTER_MORNING_SMTP_USERNAME: ${{ secrets.BETTER_MORNING_SMTP_USERNAME }}
   BETTER_MORNING_SMTP_PASSWORD: ${{ secrets.BETTER_MORNING_SMTP_PASSWORD }}
-  # GITHUB_TOKEN is automatically provided for GitHub Release creation
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Pass the token to the script
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to create GitHub releases
 
     steps:
       - name: Checkout repository
