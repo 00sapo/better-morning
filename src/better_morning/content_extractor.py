@@ -1,7 +1,7 @@
 import requests
-from bs4 import BeautifulSoup
 from typing import Optional, List
 import magic
+import trafilatura
 
 from .rss_fetcher import Article
 from .config import ContentExtractionSettings
@@ -12,28 +12,11 @@ class ContentExtractor:
         self.settings = settings
 
     def _extract_from_html(self, html_content: str) -> Optional[str]:
-        """Extracts textual content from HTML using BeautifulSoup."""
-        soup = BeautifulSoup(html_content, self.settings.parser_type)
-        # ... (existing HTML extraction logic remains the same)
-        selectors = [
-            "div.article-content",
-            "div.entry-content",
-            "div.post-content",
-            "article",
-            "main",
-            "#content",
-            ".content",
-            ".story-body",
-            ".article-body",
-        ]
-        for selector in selectors:
-            element = soup.select_one(selector)
-            if element:
-                paragraphs = element.find_all("p")
-                text_content = "\n\n".join(p.get_text() for p in paragraphs)
-                return text_content.strip()
-        all_paragraphs = soup.find_all("p")
-        return "\n\n".join(p.get_text() for p in all_paragraphs).strip() or None
+        """Extracts main textual content from HTML using the trafilatura library."""
+        # trafilatura is a specialized tool for finding and extracting the
+        # core article text from a webpage, filtering out boilerplate.
+        text_content = trafilatura.extract(html_content, include_comments=False, include_tables=False)
+        return text_content.strip() if text_content else None
 
     def get_content(self, article: Article) -> Article:
         if not self.settings.follow_article_links:

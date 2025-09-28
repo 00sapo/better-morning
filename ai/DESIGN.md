@@ -20,6 +20,7 @@ The goal of this project is to create a system that generates a daily news diges
 - **LLM Interaction**: `litellm` (for multimodal summarization)
 - **Content-Type Detection**: `python-magic`
 - **Configuration Format**: TOML
+- **HTML Content Extraction**: `trafilatura`
 
 ## Directory Structure
 
@@ -83,7 +84,7 @@ This module is responsible for fetching content from an article's link and prepa
         -   Initializes with `ContentExtractionSettings`.
         -   **`get_content(article: Article) -> Article`**: The main method for content retrieval. If `follow_article_links` is `False`, it uses the RSS `summary`. Otherwise, it downloads the content from the article's link.
         -   It uses the `python-magic` library to reliably determine the content's MIME type (e.g., `text/html`, `application/pdf`).
-        -   If the content is HTML, it uses `_extract_from_html` with `BeautifulSoup` to parse and extract the main text.
+        -   If the content is HTML, it now uses `_extract_from_html` with the **`trafilatura`** library, a powerful tool designed to robustly extract the main article text while filtering out boilerplate like ads, headers, and footers.
         -   If the content is a PDF, it does *not* extract text. Instead, it stores the raw binary content of the PDF in `article.raw_content` and sets `article.content_type` to `application/pdf`.
         -   This approach prepares the `Article` object for multimodal processing by the LLM summarizer.
 
