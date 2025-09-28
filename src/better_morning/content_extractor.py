@@ -28,7 +28,7 @@ class ContentExtractor:
 
         try:
             async with async_playwright() as p:
-                browser = await p.chromium.launch()
+                browser = await p.chromium.launch(args=["--no-sandbox"])
                 page = await browser.new_page()
                 print(f"Fetching content for: {article.title} from {article.link}")
                 await page.goto(str(article.link), timeout=60000)
