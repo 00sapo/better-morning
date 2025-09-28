@@ -3,7 +3,7 @@ name: Daily News Digest
 on:
   workflow_dispatch: # Allows manual triggering
   schedule:
-    - cron: '0 0 * * *' # Runs daily at 00:00 UTC
+    - cron: "0 0 * * *" # Runs daily at 00:00 UTC
 
 env:
   PYTHONUNBUFFERED: "1" # Ensure Python output is unbuffered
@@ -18,30 +18,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Cache article history
-      uses: actions/cache@v4
-      with:
-        path: history/
-        key: ${{ runner.os }}-history-${{ github.ref }}
-        restore-keys: |
-          ${{ runner.os }}-history-
+      - name: Cache article history
+        uses: actions/cache@v4
+        with:
+          path: history/
+          key: ${{ runner.os }}-history-${{ github.ref }}
+          restore-keys: |
+            ${{ runner.os }}-history-
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.13'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
 
-    - name: Install uv and dependencies
-      run: |
-        pip install uv
-        uv sync
+      - name: Install uv and dependencies
+        run: |
+          pip install uv
+          uv sync
 
-    - name: Install Playwright Browsers
-      run: |
-        uv run playwright install --with-deps
+      - name: Install Playwright Browsers
+        run: |
+          uv run playwright install --with-deps
 
-    - name: Run Daily Digest Generation
-      run: python src/main.py
+      - name: Run Daily Digest Generation
+        run: uv run src/main.py
