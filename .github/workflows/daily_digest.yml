@@ -3,7 +3,7 @@ name: Daily News Digest
 on:
   workflow_dispatch: # Allows manual triggering
   schedule:
-    - cron: '30 7 * * *' # Runs daily at 07:30 UTC (8:30 CET)
+    - cron: "30 7 * * *" # Runs daily at 07:30 UTC (8:30 CET)
 
 env:
   PYTHONUNBUFFERED: "1" # Ensure Python output is unbuffered
@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: personal # remove this!!!
 
       - name: Cache article history
         uses: actions/cache@v4

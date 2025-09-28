@@ -7,7 +7,6 @@ import glob
 from better_morning.config import (
     load_global_config,
     load_collection,
-    Collection,
     GlobalConfig,
 )
 from better_morning.rss_fetcher import RSSFetcher
@@ -32,41 +31,48 @@ async def process_collection(
         settings=collection_config.llm_settings, global_config=global_config
     )
 
-    # 1. Fetch new RSS articles
-    new_articles = rss_fetcher.fetch_articles(collection_config.name)
-    print(f"Found {len(new_articles)} new articles for {collection_config.name}.")
+    try:
+        # Start the browser for content extraction
+        await content_extractor.start_browser()
 
-    if not new_articles:
-        return (
-            collection_config.name,
-            "No new articles found for this collection today.\n",
+        # 1. Fetch new RSS articles
+        new_articles = rss_fetcher.fetch_articles(collection_config.name)
+        print(f"Found {len(new_articles)} new articles for {collection_config.name}.")
+
+        if not new_articles:
+            return (
+                collection_config.name,
+                "No new articles found for this collection today.\n",
+            )
+
+        # 2. Extract content for new articles concurrently
+        content_extraction_tasks = [
+            content_extractor.get_content(article) for article in new_articles
+        ]
+        processed_articles = await asyncio.gather(*content_extraction_tasks)
+
+        articles_with_content = [
+            article for article in processed_articles if article.content
+        ]
+
+        if not articles_with_content:
+            return (
+                collection_config.name,
+                "No articles with extractable content for this collection today.\n",
+            )
+
+        print(
+            f"Summarizing {len(articles_with_content)} articles for {collection_config.name}..."
+        )
+        # 3. Summarize the collection
+        collection_digest_summary = await llm_summarizer.summarize_articles_collection(
+            articles_with_content, collection_prompt=collection_config.collection_prompt
         )
 
-    # 2. Extract content for new articles concurrently
-    content_extraction_tasks = [
-        content_extractor.get_content(article) for article in new_articles
-    ]
-    processed_articles = await asyncio.gather(*content_extraction_tasks)
-
-    articles_with_content = [
-        article for article in processed_articles if article.content
-    ]
-
-    if not articles_with_content:
-        return (
-            collection_config.name,
-            "No articles with extractable content for this collection today.\n",
-        )
-
-    print(
-        f"Summarizing {len(articles_with_content)} articles for {collection_config.name}..."
-    )
-    # 3. Summarize the collection
-    collection_digest_summary = await llm_summarizer.summarize_articles_collection(
-        articles_with_content, collection_prompt=collection_config.collection_prompt
-    )
-
-    return collection_config.name, collection_digest_summary
+        return collection_config.name, collection_digest_summary
+    finally:
+        # Ensure the browser is closed
+        await content_extractor.close_browser()
 
 
 async def main():

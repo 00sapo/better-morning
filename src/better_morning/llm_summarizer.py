@@ -189,9 +189,7 @@ class LLMSummarizer:
         # The user's custom prompt will be integrated as an additional guideline.
         user_guideline = ""
         if collection_prompt:
-            user_guideline = (
-                f"Additionally, please follow this specific guideline when summarizing: '{collection_prompt}'"
-            )
+            user_guideline = f"Additionally, please follow this specific guideline when summarizing: '{collection_prompt}'"
 
         collection_summary_prompt = (
             f"From the following list of article summaries, please identify the {self.settings.n_most_important_news} "

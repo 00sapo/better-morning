@@ -2,12 +2,11 @@ import requests
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import Dict, List
+from typing import Dict
 from datetime import datetime
 import markdown2
 
 from .config import OutputSettings, GlobalConfig, get_secret
-from .rss_fetcher import Article  # Still needed for type hinting potentially elsewhere
 
 
 class DocumentGenerator:
