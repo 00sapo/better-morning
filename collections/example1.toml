@@ -1,0 +1,9 @@
+name = "Tech News"
+
+[[feeds]]
+url = "https://news.ycombinator.com/rss"
+name = "Hacker News"
+
+[[feeds]]
+url = "http://www.reddit.com/r/programming/.rss"
+name = "Reddit Programming"
