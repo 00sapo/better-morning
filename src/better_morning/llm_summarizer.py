@@ -185,11 +185,6 @@ class LLMSummarizer:
             [f"Title: {art.title}\nSummary: {art.summary}" for art in top_n_articles]
         )
 
-        # --- Debugging: Print concatenated summaries ---
-        print("\n--- Concatenated Summaries for Collection-Level Prompt ---")
-        print(concatenated_summaries)
-        print("----------------------------------------------------------\n")
-
         if not concatenated_summaries:
             return "No content available for collection summary."
 
@@ -206,13 +201,5 @@ class LLMSummarizer:
             prompt=collection_summary_prompt,
             title="Daily Digest Collection Summary",
         )
-
-        # --- Debugging: Print final collection summary ---
-        print("\n--- Final Generated Collection Summary ---")
-        if final_summary:
-            print(final_summary)
-        else:
-            print("[Empty summary returned by LLM]")
-        print("------------------------------------------\n")
 
         return final_summary or "Could not generate collection summary."
