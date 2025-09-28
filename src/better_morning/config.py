@@ -6,11 +6,12 @@ import os
 
 # --- LLM Settings ---
 class LLMSettings(BaseModel):
-    model: str = "gpt-4o"
+    model: str = Nones
     temperature: float = 0.7
     n_most_important_news: int = 5
     k_words_each_summary: int = 100
     prompt_template: Optional[str] = None  # Collection-specific prompt or for filtering
+    api_key: Optional[str] = None # To hold the resolved API key
 
 
 # --- Content Extraction Settings ---
@@ -110,20 +111,29 @@ def load_collection(collection_path: str, global_config: GlobalConfig) -> Collec
         )
 
         # Merge LLM settings: collection overrides global defaults
-        resolved_llm_settings_data = global_config.default_llm_settings.model_dump(
-            exclude_unset=True
-        )
+        # Start with the base defaults from the Pydantic model.
+        resolved_llm_settings_data = LLMSettings().model_dump()
+        # Layer the global config settings on top.
+        resolved_llm_settings_data.update(global_config.default_llm_settings.model_dump(exclude_unset=True))
+        # Finally, layer the collection-specific settings, which take highest priority.
         if overrides.llm_settings:
             resolved_llm_settings_data.update(
                 overrides.llm_settings.model_dump(exclude_unset=True)
             )
         resolved_llm_settings = LLMSettings(**resolved_llm_settings_data)
 
+        # After resolving the model, resolve and set the API key for it.
+        try:
+            api_key = get_secret(global_config.llm_api_token_env, f"LLM API Token for model '{resolved_llm_settings.model}'")
+            resolved_llm_settings.api_key = api_key
+        except ValueError as e:
+            print(f"Warning: Could not resolve API key for collection '{collection_data['name']}'. LLM calls may fail. Error: {e}")
+
         # Merge Content Extraction settings: collection overrides global defaults
-        resolved_content_extraction_settings_data = (
-            global_config.default_content_extraction_settings.model_dump(
-                exclude_unset=True
-            )
+        # Apply the same hierarchical merging logic.
+        resolved_content_extraction_settings_data = ContentExtractionSettings().model_dump()
+        resolved_content_extraction_settings_data.update(
+            global_config.default_content_extraction_settings.model_dump(exclude_unset=True)
         )
         if overrides.content_extraction_settings:
             resolved_content_extraction_settings_data.update(

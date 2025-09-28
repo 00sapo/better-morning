@@ -14,14 +14,6 @@ class LLMSummarizer:
     def __init__(self, settings: LLMSettings, global_config: GlobalConfig):
         self.settings = settings
         self.global_config = global_config
-        self.api_key = None
-
-        try:
-            api_key = get_secret(global_config.llm_api_token_env, "LLM API Token")
-            self.api_key = api_key
-        except ValueError as e:
-            print(f"Error initializing LLMSummarizer: {e}")
-            print("LLM calls might fail due to missing API token.")
 
     def _truncate_text_to_token_limit(
         self, text: str, token_limit: int
@@ -117,7 +109,7 @@ class LLMSummarizer:
                 model=self.settings.model,
                 messages=messages,
                 temperature=self.settings.temperature,
-                api_key=self.api_key,
+                api_key=self.settings.api_key,
             )
             article.summary = response.choices[0].message.content
             return article

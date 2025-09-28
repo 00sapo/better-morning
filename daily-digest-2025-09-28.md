@@ -2,8 +2,7 @@
 
 ## General Daily News
 
-No new articles found for this collection today.
-
+No articles with valid summaries to process for the collection summary.
 
 ---
 
