@@ -9,6 +9,7 @@ dependencies = [
   "feedparser>=6.0.12",
   "litellm>=1.77.5",
   "markdown2>=2.5.4",
+  "playwright>=1.55.0",
   "pydantic>=2.11.9",
   "python-magic>=0.4.27",
   "requests>=2.32.5",

@@ -2,6 +2,7 @@ import requests
 from typing import Optional, List
 import magic
 import trafilatura
+from playwright.async_api import async_playwright
 
 from .rss_fetcher import Article
 from .config import ContentExtractionSettings
@@ -18,52 +19,34 @@ class ContentExtractor:
         text_content = trafilatura.extract(html_content, include_comments=False, include_tables=False)
         return text_content.strip() if text_content else None
 
-    def get_content(self, article: Article) -> Article:
+    async def get_content(self, article: Article) -> Article:
         if not self.settings.follow_article_links:
             article.content = article.summary
             # Ensure content_type is set for consistency, even if it's just text
             article.content_type = "text/plain"
             return article
 
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        }
-
         try:
-            print(f"Fetching content for: {article.title} from {article.link}")
-            response = requests.get(str(article.link), headers=headers, timeout=15)
-            response.raise_for_status()
-
-            # Use python-magic to reliably determine the content type from the response body
-            mime_type = magic.from_buffer(response.content, mime=True)
-            article.content_type = mime_type
-
-            if "application/pdf" in mime_type:
-                print(f"Identified PDF content for: {article.title}")
-                article.raw_content = response.content
-                # The text `content` field can be a short placeholder.
-                article.content = f"PDF document with title '{article.title}' is attached for summarization."
-            elif "text/html" in mime_type:
-                print(f"Identified HTML content for: {article.title}")
-                article.content = self._extract_from_html(response.text)
-            else:
-                print(
-                    f"Warning: Unsupported content type '{mime_type}' for {article.link}."
-                )
-                article.content = article.summary  # Fallback
-
-            # Fallback if extraction fails for some reason
-            if not article.content and not article.raw_content:
-                article.content = article.summary
-
-            return article
-        except requests.exceptions.RequestException as e:
-            print(f"Error fetching article {article.link}: {e}")
-            article.content = None # Ensure content is None on error
-            return article
+            async with async_playwright() as p:
+                browser = await p.chromium.launch()
+                page = await browser.new_page()
+                print(f"Fetching content for: {article.title} from {article.link}")
+                await page.goto(str(article.link), timeout=60000)
+                html_content = await page.content()
+                await browser.close()
+    
+                # We assume the content is HTML since we're using a browser
+                article.content_type = "text/html"
+                article.content = self._extract_from_html(html_content)
+    
+                if not article.content:
+                    # Fallback to RSS summary if trafilatura fails
+                    article.content = article.summary
+    
+                return article
         except Exception as e:
             print(
-                f"An unexpected error occurred during content extraction for {article.link}: {e}"
+                f"Error fetching article with Playwright {article.link}: {e}"
             )
-            article.content = None # Ensure content is None on error
+            article.content = None  # Ensure content is None on error
             return article

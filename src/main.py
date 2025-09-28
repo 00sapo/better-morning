@@ -42,16 +42,15 @@ async def process_collection(
             "No new articles found for this collection today.\n",
         )
 
-    # 2. Extract content for new articles
-    articles_with_content = []
-    for article in new_articles:
-        processed_article = content_extractor.get_content(article)
-        if processed_article.content:
-            articles_with_content.append(processed_article)
-        else:
-            print(
-                f"Warning: No content (or summary fallback) for article: {article.title}. Skipping for summarization."
-            )
+    # 2. Extract content for new articles concurrently
+    content_extraction_tasks = [
+        content_extractor.get_content(article) for article in new_articles
+    ]
+    processed_articles = await asyncio.gather(*content_extraction_tasks)
+
+    articles_with_content = [
+        article for article in processed_articles if article.content
+    ]
 
     if not articles_with_content:
         return (

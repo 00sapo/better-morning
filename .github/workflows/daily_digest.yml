@@ -31,5 +31,9 @@ jobs:
         pip install uv
         uv sync
 
+    - name: Install Playwright Browsers
+      run: |
+        uv run playwright install --with-deps
+
     - name: Run Daily Digest Generation
       run: python src/main.py
