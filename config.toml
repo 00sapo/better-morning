@@ -1,0 +1,26 @@
+[project]
+
+[global]
+llm_api_token_env = "BETTER_MORNING_LLM_API_KEY"
+token_size_threshold = 131072 # 128 * 1024
+
+[global.default_llm_settings]
+model = "gpt-4o"
+temperature = 0.0
+n_most_important_news = 5
+k_words_each_summary = 100
+
+[global.default_content_extraction_settings]
+follow_article_links = false
+parser_type = "html.parser"
+
+[global.default_output_settings]
+output_type = "github_release"
+github_token_env = "BETTER_MORNING_GH_TOKEN"
+# For email output, uncomment and configure:
+# output_type = "email"
+# smtp_server = "smtp.example.com"
+# smtp_port = 587
+# smtp_username_env = "BETTER_MORNING_SMTP_USERNAME"
+# smtp_password_env = "BETTER_MORNING_SMTP_PASSWORD"
+# recipient_email = "your_email@example.com"

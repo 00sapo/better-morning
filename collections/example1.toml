@@ -1,9 +1,18 @@
 name = "Tech News"
 
 [[feeds]]
-url = "https://news.ycombinator.com/rss"
-name = "Hacker News"
+url = "https://www.theverge.com/rss/index.xml"
+name = "The Verge"
 
 [[feeds]]
-url = "http://www.reddit.com/r/programming/.rss"
-name = "Reddit Programming"
+url = "https://techcrunch.com/feed/"
+name = "TechCrunch"
+
+[llm_settings]
+n_most_important_news = 3
+k_words_each_summary = 75
+
+[content_extraction_settings]
+follow_article_links = true
+
+collection_prompt = "Summarize the following tech news focusing on AI and new gadgets."
