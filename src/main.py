@@ -1,68 +1,107 @@
 import os
 from datetime import datetime
+from typing import Dict, List
+import asyncio
+import glob
 
-from better_morning.config import load_config
+from better_morning.config import load_global_config, load_collection, Collection, GlobalConfig
 from better_morning.rss_fetcher import RSSFetcher
 from better_morning.content_extractor import ContentExtractor
 from better_morning.llm_summarizer import LLMSummarizer
 from better_morning.document_generator import DocumentGenerator
 
-def main():
+async def process_collection(collection_path: str, global_config: GlobalConfig) -> tuple[str, str]:
+    """Processes a single news collection: fetches, extracts, summarizes, and returns its digest."""
+    print(f"\n--- Processing collection: {collection_path} ---")
+    collection_config = load_collection(collection_path, global_config)
+
+    # Initialize components with collection-specific or merged settings
+    rss_fetcher = RSSFetcher(feeds=collection_config.feeds)
+    content_extractor = ContentExtractor(settings=collection_config.content_extraction_settings)
+    llm_summarizer = LLMSummarizer(settings=collection_config.llm_settings, global_config=global_config)
+
+    # 1. Fetch new RSS articles
+    new_articles = rss_fetcher.fetch_articles(collection_config.name)
+    print(f"Found {len(new_articles)} new articles for {collection_config.name}.")
+
+    if not new_articles:
+        return collection_config.name, "No new articles found for this collection today.\n"
+
+    # 2. Extract content for new articles
+    articles_with_content = []
+    for article in new_articles:
+        processed_article = content_extractor.get_content(article)
+        if processed_article.content:
+            articles_with_content.append(processed_article)
+        else:
+            print(f"Warning: No content (or summary fallback) for article: {article.title}. Skipping for summarization.")
+    
+    if not articles_with_content:
+        return collection_config.name, "No articles with extractable content for this collection today.\n"
+
+    # 3. Summarize the collection
+    collection_digest_summary = await llm_summarizer.summarize_articles_collection(
+        articles_with_content, 
+        collection_prompt=collection_config.collection_prompt
+    )
+
+    return collection_config.name, collection_digest_summary
+
+async def main():
     print("Starting better-morning daily digest generation...")
 
-    # 1. Load configuration
-    config_path = os.getenv("BETTER_MORNING_CONFIG", "collections/example1.toml")
+    # 1. Load global configuration
     try:
-        collection_config = load_config(config_path)
-        print(f"Loaded configuration for collection: {collection_config.name}")
+        global_config = load_global_config()
+        print("Global configuration loaded successfully.")
     except Exception as e:
-        print(f"Failed to load configuration from {config_path}: {e}")
+        print(f"Failed to load global configuration: {e}")
         return
 
-    # 2. Fetch RSS articles
-    rss_fetcher = RSSFetcher(feeds=collection_config.feeds)
-    articles = rss_fetcher.fetch_articles()
-    print(f"Fetched {len(articles)} articles.")
-
-    if not articles:
-        print("No new articles found. Exiting.")
+    # 2. Find all collection files
+    collection_files = glob.glob("collections/*.toml")
+    if not collection_files:
+        print("No collection TOML files found in the 'collections/' directory. Exiting.")
         return
+    
+    print(f"Found {len(collection_files)} collections to process.")
 
-    # 3. Extract content and summarize
-    content_extractor = ContentExtractor()
-    # For LLMSummarizer, you might want to get the model and API key from config or environment
-    llm_summarizer = LLMSummarizer(model=os.getenv("LLM_MODEL", "gpt-4o"), api_key=os.getenv("LLM_API_KEY"))
+    # 3. Process each collection concurrently
+    tasks = [process_collection(filepath, global_config) for filepath in collection_files]
+    collection_results: List[tuple[str, str]] = await asyncio.gather(*tasks)
 
-    summarized_articles = []
-    for article in articles:
-        print(f"Processing article: {article.title}")
-        full_text = content_extractor.extract_article_text(article)
-        if full_text:
-            summary = llm_summarizer.summarize_text(article.title, full_text)
-            if summary:
-                article.summary = summary
-                summarized_articles.append(article)
-            else:
-                print(f"Could not summarize article: {article.title}")
-        else:
-            print(f"Could not extract content for article: {article.title}")
+    # Aggregate all collection summaries
+    all_collection_summaries: Dict[str, str] = {name: summary for name, summary in collection_results}
 
-    print(f"Successfully summarized {len(summarized_articles)} articles.")
+    # 4. Generate final markdown digest
+    today = datetime.now(timezone.utc)
+    document_generator = DocumentGenerator(global_config.default_output_settings, global_config)
+    final_markdown_digest = document_generator.generate_markdown_digest(all_collection_summaries, today)
 
-    if not summarized_articles:
-        print("No articles were summarized. Exiting.")
-        return
-
-    # 4. Generate Markdown digest
-    document_generator = DocumentGenerator()
-    today = datetime.now()
-    markdown_digest = document_generator.generate_markdown_digest(summarized_articles, today)
-
-    # 5. Output the digest (for now, print to console)
-    print("\n--- Generated Daily Digest ---\n")
-    print(markdown_digest)
+    print("\n--- Generated Final Daily Digest ---\n")
+    print(final_markdown_digest)
     print("\n--- End of Digest ---\n")
 
+    # 5. Output the digest based on global settings
+    output_type = global_config.default_output_settings.output_type
+
+    if output_type == "github_release":
+        repo_slug = os.getenv("GITHUB_REPOSITORY") # e.g., 'owner/repo' from GitHub Actions
+        if not repo_slug:
+            print("Error: GITHUB_REPOSITORY environment variable not set. Cannot create GitHub release.")
+            return
+        tag_name = f"daily-digest-{today.strftime("%Y-%m-%d")}"
+        release_name = f"Daily News Digest {today.strftime("%Y-%m-%d")}"
+        document_generator.create_github_release(tag_name, release_name, final_markdown_digest, repo_slug)
+    elif output_type == "email":
+        recipient_email = global_config.default_output_settings.recipient_email
+        if not recipient_email:
+            print("Error: Recipient email not configured for email output. Cannot send email.")
+            return
+        subject = f"Daily News Digest - {today.strftime("%Y-%m-%d")}"
+        document_generator.send_via_email(subject, final_markdown_digest, recipient_email)
+    else:
+        print(f"Warning: Unknown output type '{output_type}'. Digest only printed to console.")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

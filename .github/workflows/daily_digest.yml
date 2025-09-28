@@ -1,0 +1,35 @@
+name: Daily News Digest
+
+on:
+  workflow_dispatch: # Allows manual triggering
+  schedule:
+    - cron: '0 0 * * *' # Runs daily at 00:00 UTC
+
+env:
+  PYTHONUNBUFFERED: "1" # Ensure Python output is unbuffered
+  # These will be populated from GitHub Secrets
+  BETTER_MORNING_LLM_API_KEY: ${{ secrets.BETTER_MORNING_LLM_API_KEY }}
+  BETTER_MORNING_SMTP_USERNAME: ${{ secrets.BETTER_MORNING_SMTP_USERNAME }}
+  BETTER_MORNING_SMTP_PASSWORD: ${{ secrets.BETTER_MORNING_SMTP_PASSWORD }}
+  # GITHUB_TOKEN is automatically provided for GitHub Release creation
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Install uv and dependencies
+      run: |
+        pip install uv
+        uv sync
+
+    - name: Run Daily Digest Generation
+      run: python src/main.py
