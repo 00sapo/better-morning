@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> This repo is 90% entirely vibe-coded, including this readme. But I use it, so it should kinda work.
+
 # 🌅 Better Morning
 
 **Better Morning** is an automated news digest system that fetches articles from user-defined RSS feeds, summarizes them using a Language Model (LLM) of your choice, and delivers a personalized news summary daily.
