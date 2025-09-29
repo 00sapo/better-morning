@@ -61,23 +61,15 @@ class ContentExtractor:
             return None
 
     async def get_content(self, article: Article) -> Article:
-        # If follow_article_links is False, only use RSS summary
-        if not self.settings.follow_article_links:
-            print(
-                f"Info: Using RSS summary for '{article.title}' (follow_article_links=False)."
-            )
-            article.content = article.summary or ""
-            article.content_type = "text/plain"
-            return article
-
-        # If summary is long enough, use it without fetching
-        if article.summary and len(article.summary.split()) > 400:
-            print(
-                f"Info: Using RSS summary for '{article.title}' as it's over 400 words."
-            )
+        # If RSS summary is long enough (≥400 words), use it without fetching the article
+        if article.summary and len(article.summary.split()) >= 400:
+            print(f"Info: Using RSS summary for '{article.title}' as it has {len(article.summary.split())} words (≥400).")
             article.content = article.summary
             article.content_type = "text/plain"
             return article
+
+        # If RSS summary is short (<400 words), fetch the main article content
+        print(f"Info: RSS summary for '{article.title}' has only {len(article.summary.split()) if article.summary else 0} words (<400). Fetching article content...")
 
         # First, try fetching with requests
         response = await self._fetch_with_requests(str(article.link))
