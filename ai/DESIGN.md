@@ -55,7 +55,7 @@ The goal of this project is to create a system that generates a daily news diges
 
 This module defines Pydantic models for structured configuration and provides functions to load and merge these configurations.
 
--   **`LLMSettings`**: Defines parameters for LLM interactions (model, temperature, number of news, words per summary, prompt template, output language).
+-   **`LLMSettings`**: Defines parameters for LLM interactions (reasoner_model, light_model, temperature, number of news, words per summary, prompt template, output language).
 -   **`ContentExtractionSettings`**: Configures how article content is extracted (whether to follow links, parser type, link filter pattern for selective link following).
 -   **`OutputSettings`**: Specifies the output method (GitHub Release or email) and related credentials/settings.
 -   **`GlobalConfig`**: Holds application-wide settings, including default LLM, content extraction, and output settings, along with environment variable names for secrets.
@@ -102,6 +102,7 @@ This module interfaces with large language models via `litellm` to summarize art
 -   **`TOKEN_TO_CHAR_RATIO`**: A constant for rough estimation of tokens based on character count.
 -   **`LLMSummarizer`**: A class that:
         -   Initializes with `LLMSettings` and `GlobalConfig`.
+        -   Uses the `light_model` for single-article summaries and the `reasoner_model` for the final collection summary.
         -   **`summarize_text(article: Article, prompt_override: Optional[str] = None) -> Article`**: The core summarization method. It checks the `article.content_type` to determine how to process the content.
         -   **For standard text content**: It constructs a text-based prompt from the article's title and content, truncates it if necessary, and calls `litellm.completion`.
         -   **For PDF content (`application/pdf`)**: It constructs a **multimodal message** for `litellm`. This message includes a text part (e.g., "Summarize this PDF") and the raw PDF data from `article.raw_content`. This allows a capable LLM (like GPT-4o) to "read" the PDF directly.

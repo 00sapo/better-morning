@@ -6,7 +6,8 @@ import os
 
 # --- LLM Settings ---
 class LLMSettings(BaseModel):
-    model: str = ""
+    reasoner_model: str = ""
+    light_model: str = ""
     temperature: float = 0.7
     n_most_important_news: int = 5
     k_words_each_summary: int = 100
@@ -143,7 +144,7 @@ def load_collection(collection_path: str, global_config: GlobalConfig) -> Collec
         try:
             api_key = get_secret(
                 global_config.llm_api_token_env,
-                f"LLM API Token for model '{resolved_llm_settings.model}'",
+                f"LLM API Token for model '{resolved_llm_settings.reasoner_model}'",
             )
             resolved_llm_settings.api_key = api_key
         except ValueError as e:

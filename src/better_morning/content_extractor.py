@@ -172,13 +172,33 @@ class ContentExtractor:
             for link in unique_links:
                 print(f"  -> Fetching sub-link: {link}")
                 sub_response = await self._fetch_with_requests(link)
-                if sub_response and "application/pdf" not in sub_response.headers.get(
-                    "Content-Type", ""
-                ):
-                    sub_html_content = sub_response.text
-                    sub_text_content = self._extract_from_html(sub_html_content)
-                    if sub_text_content:
-                        all_text_contents.append(sub_text_content)
+                if sub_response:
+                    sub_content_type = sub_response.headers.get("Content-Type", "").lower()
+                    sub_final_url = sub_response.url
+
+                    try:
+                        sub_detected_mime = magic.from_buffer(sub_response.content, mime=True)
+                    except Exception:
+                        sub_detected_mime = ""
+
+                    is_pdf = (
+                        sub_detected_mime == "application/pdf"
+                        or "application/pdf" in sub_content_type
+                        or "pdf" in sub_content_type
+                        or str(sub_final_url).lower().endswith(".pdf")
+                    )
+
+                    if is_pdf:
+                        print(f"PDF content found at sub-link for '{article.title}'.")
+                        article.raw_content = sub_response.content
+                        article.content_type = "application/pdf"
+                        # Found PDF, so we can return
+                        return article
+                    else:
+                        sub_html_content = sub_response.text
+                        sub_text_content = self._extract_from_html(sub_html_content)
+                        if sub_text_content:
+                            all_text_contents.append(sub_text_content)
 
         # Combine all text content
         article.content = "\n\n--- LINKED CONTENT ---\n\n".join(all_text_contents)

@@ -1,5 +1,6 @@
 [llm_settings]
-model = "gemini/gemini-2.5-flash"
+reasoner_model = "gemini/gemini-2.5-pro"
+light_model = "gemini/gemini-2.5-flash-lite"
 temperature = 0.5
 n_most_important_news = 10
 k_words_each_summary = 200

@@ -111,10 +111,10 @@ class LLMSummarizer:
                 raise ValueError("Message list for LLM completion is empty.")
 
             print(
-                f"Summarizing '{article.title}' with model '{self.settings.model}'. API Key: {self._get_masked_api_key()}"
+                f"Summarizing '{article.title}' with model '{self.settings.light_model}'. API Key: {self._get_masked_api_key()}"
             )
             response = await litellm.acompletion(
-                model=self.settings.model,
+                model=self.settings.light_model,
                 messages=messages,
                 temperature=self.settings.temperature,
                 api_key=self.settings.api_key,
@@ -134,7 +134,7 @@ class LLMSummarizer:
             return article
 
     async def _summarize_text_content(
-        self, text_content: str, prompt: str, title: str = "Untitled", timeout=120
+        self, text_content: str, prompt: str, model_name: str, title: str = "Untitled", timeout=120
     ) -> str:
         """Helper to summarize raw text content using the configured LLM."""
         truncated_prompt, _ = self._truncate_text_to_token_limit(
@@ -144,7 +144,7 @@ class LLMSummarizer:
 
         try:
             response = await litellm.acompletion(
-                model=self.settings.model,
+                model=model_name,
                 messages=messages,
                 temperature=self.settings.temperature,
                 api_key=self.settings.api_key,
@@ -209,6 +209,7 @@ class LLMSummarizer:
         final_summary = await self._summarize_text_content(
             text_content=concatenated_summaries,
             prompt=collection_summary_prompt,
+            model_name=self.settings.reasoner_model,
             title="Daily Digest Collection Summary",
             timeout=300,
         )
