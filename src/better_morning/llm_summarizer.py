@@ -213,9 +213,9 @@ class LLMSummarizer:
         collection_summary_prompt = (
             f"From the following list of article summaries, please identify the {self.settings.n_most_important_news} "
             f"most important news stories. Then, write a cohesive and concise summary of those top stories. "
-            f"The final summary should be approximately {self.settings.k_words_each_summary * self.settings.n_most_important_news} words. "
             f"The final summary must be in {self.settings.output_language}. "
             f"**Crucially, for every piece of information you include, you MUST cite the source using a Markdown link like this: ([Source](Link)).** "
+            f"The final summary MUST be of {self.settings.k_words_each_summary * min(self.settings.n_most_important_news, len(effectively_summarized_articles))} words. "
             f"{user_guideline}\n\n"
             f"Answer with only the final summary, without introductions nor conclusions. Here are the summaries:\n{concatenated_summaries}"
         )
