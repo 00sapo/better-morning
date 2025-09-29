@@ -21,6 +21,7 @@ The goal of this project is to create a system that generates a daily news diges
 - **Content-Type Detection**: `python-magic`
 - **Configuration Format**: TOML
 - **HTML Content Extraction**: `trafilatura`
+- **Web Browser Automation**: `playwright` (for dynamic content and fallback when requests fails)
 
 ## Directory Structure
 
@@ -52,8 +53,8 @@ The goal of this project is to create a system that generates a daily news diges
 
 This module defines Pydantic models for structured configuration and provides functions to load and merge these configurations.
 
--   **`LLMSettings`**: Defines parameters for LLM interactions (model, temperature, number of news, words per summary, prompt template).
--   **`ContentExtractionSettings`**: Configures how article content is extracted (whether to follow links, parser type).
+-   **`LLMSettings`**: Defines parameters for LLM interactions (model, temperature, number of news, words per summary, prompt template, output language).
+-   **`ContentExtractionSettings`**: Configures how article content is extracted (whether to follow links, parser type, link filter pattern for selective link following).
 -   **`OutputSettings`**: Specifies the output method (GitHub Release or email) and related credentials/settings.
 -   **`GlobalConfig`**: Holds application-wide settings, including default LLM, content extraction, and output settings, along with environment variable names for secrets.
 -   **`RSSFeed`**: A model to define an individual RSS feed, including its `url`, optional `name`, and an optional `max_articles` limit to control how many of the latest articles are fetched.
@@ -78,15 +79,19 @@ This module handles fetching RSS feeds, parsing entries, and managing historical
 
 ### 3. Content Extraction (`src/better_morning/content_extractor.py`)
 
-This module is responsible for fetching content from an article's link and preparing it for summarization. It intelligently handles different content types.
+This module is responsible for fetching content from an article's link and preparing it for summarization. It intelligently handles different content types and implements smart content fetching strategies.
 
 -   **`ContentExtractor`**: A class that:
-        -   Initializes with `ContentExtractionSettings`.
-        -   **`get_content(article: Article) -> Article`**: The main method for content retrieval. If `follow_article_links` is `False`, it uses the RSS `summary`. Otherwise, it downloads the content from the article's link.
-        -   It uses the `python-magic` library to reliably determine the content's MIME type (e.g., `text/html`, `application/pdf`).
-        -   If the content is HTML, it now uses `_extract_from_html` with the **`trafilatura`** library, a powerful tool designed to robustly extract the main article text while filtering out boilerplate like ads, headers, and footers.
-        -   If the content is a PDF, it does *not* extract text. Instead, it stores the raw binary content of the PDF in `article.raw_content` and sets `article.content_type` to `application/pdf`.
-        -   This approach prepares the `Article` object for multimodal processing by the LLM summarizer.
+        -   Initializes with `ContentExtractionSettings` and manages a Playwright browser instance for dynamic content.
+        -   **`start_browser()` and `close_browser()`**: Manages the lifecycle of a Playwright browser instance for efficient resource usage.
+        -   **`get_content(article: Article) -> Article`**: The main method for content retrieval with intelligent decision-making:
+            -   **Smart RSS Length Check**: If the RSS summary is ≥400 words, uses it directly without fetching the article, reducing unnecessary requests.
+            -   **Dual Fetching Strategy**: First attempts to fetch content using `requests` for static pages, then falls back to Playwright for dynamic content if needed.
+            -   **PDF Handling**: Detects PDF content via Content-Type headers and stores raw binary data in `article.raw_content` for multimodal processing.
+            -   **Link Following**: When `follow_article_links` is enabled, can follow and extract content from related links using optional regex pattern filtering via `link_filter_pattern`.
+        -   **`_extract_from_html()`**: Uses the **`trafilatura`** library to robustly extract main article text while filtering out boilerplate content like ads and navigation.
+        -   **`_fetch_with_requests()`**: Handles static content fetching with proper error handling and User-Agent headers.
+        -   The system gracefully handles failures by falling back to RSS summaries when content extraction fails.
 
 ### 4. LLM Summarization (`src/better_morning/llm_summarizer.py`)
 
@@ -115,21 +120,23 @@ This module is responsible for formatting the summarized news into a document an
 
 This is the entry point of the application, orchestrating the entire news digest generation process.
 
--   **`process_collection(collection_path: str, global_config: GlobalConfig) -> tuple[str, str]` (async)**:
+-   **`process_collection(collection_path: str, global_config: GlobalConfig) -> tuple[str, str, List[Article], List[str]]` (async)**:
     -   Loads a specific collection's configuration.
     -   Initializes `RSSFetcher`, `ContentExtractor`, and `LLMSummarizer` with the appropriate settings (merged from global and collection-specific).
+    -   Manages browser lifecycle by starting the ContentExtractor's browser instance at the beginning and ensuring proper cleanup.
     -   Fetches new articles for the collection.
-    -   Extracts content for these new articles.
+    -   Extracts content for these new articles using concurrent processing for improved performance.
+    -   Tracks skipped sources (feeds that fail to fetch or process) for monitoring and debugging.
     -   Summarizes the collection's articles into a single digest summary.
-    -   Returns the collection's name and its summary.
+    -   Returns the collection's name, its summary, the list of processed articles, and a list of skipped sources.
 -   **`main()` (async)**:
     -   Loads the `global_config`.
     -   Discovers all collection TOML files in the `collections/` directory.
     -   Uses `asyncio.gather` to concurrently call `process_collection` for each discovered collection, improving performance.
-    -   Aggregates the summaries from all collections.
-    -   Generates the `final_markdown_digest` using `DocumentGenerator`.
+    -   Aggregates the summaries from all collections and tracks skipped sources across all collections for comprehensive reporting.
+    -   Generates the `final_markdown_digest` using `DocumentGenerator`, including information about any skipped sources.
     -   Based on `global_config.default_output_settings.output_type`, it either calls `document_generator.create_github_release` or `document_generator.send_via_email`. It gracefully handles missing secrets/environment variables for local runs by saving the digest to a local Markdown file if external output is not fully configured.
-    -   Prints the final digest to the console.
+    -   Prints the final digest to the console with summary information about processing results.
 
 ### 7. Local Execution Script (`run_local.py`)
 
@@ -148,6 +155,8 @@ Automates the daily execution of the `main.py` script.
 -   **`env`**: Sets `PYTHONUNBUFFERED` and maps GitHub Secrets (like `BETTER_MORNING_LLM_API_KEY`, `BETTER_MORNING_SMTP_USERNAME`, `BETTER_MORNING_SMTP_PASSWORD`, `BETTER_MORNING_RECIPIENT_EMAIL`, `BETTER_MORNING_GITHUB_TOKEN`) to environment variables that `main.py` and its modules expect.
 -   **`jobs.build.steps`**: Defines the sequence of actions:
     1.  `Checkout repository`: Retrieves the code.
-    2.  `Set up Python`: Configures Python 3.13 environment.
-    3.  `Install uv and dependencies`: Installs `uv` and then uses it to install project dependencies from `pyproject.toml`.
-    4.  `Run Daily Digest Generation`: Executes `src/main.py` using the Python interpreter in the virtual environment.
+    2.  `Cache article history`: Caches the `history/` directory to maintain article state between runs.
+    3.  `Set up Python`: Configures Python 3.13 environment.
+    4.  `Install uv and dependencies`: Installs `uv` and then uses it to install project dependencies from `pyproject.toml`.
+    5.  `Install Playwright Browsers`: Installs Playwright browser binaries and system dependencies required for web scraping.
+    6.  `Run Daily Digest Generation`: Executes `src/main.py` using the Python interpreter in the virtual environment.
