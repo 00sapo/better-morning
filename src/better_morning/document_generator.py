@@ -23,11 +23,18 @@ class DocumentGenerator:
         self,
         overview: str,
         articles_by_collection: Dict[str, List[Article]],
+        skipped_sources: List[str],
         date: datetime,
     ) -> str:
         """Formats the digest with a top-level overview and detailed summaries."""
         title = f"# Daily Digest - {date.strftime('%Y-%m-%d')}"
         overview_section = f"## General Overview\n\n{overview}"
+
+        skipped_sources_section = ""
+        if skipped_sources:
+            skipped_sources_section = "## Skipped Sources\n\nThe following sources were skipped due to a high number of consecutive errors:\n\n"
+            for source in skipped_sources:
+                skipped_sources_section += f"- {source}\n"
 
         detailed_sections = ["## Detailed Summaries"]
         for collection_name, articles in articles_by_collection.items():
@@ -43,7 +50,10 @@ class DocumentGenerator:
                 detailed_sections.append(f"#### {article.title}\n")
                 detailed_sections.append(f"{article.summary}\n")
 
-        return "\n".join([title, overview_section, "---"] + detailed_sections)
+        return "\n".join(
+            [title, overview_section, "---", skipped_sources_section, "---"]
+            + detailed_sections
+        )
 
     def send_via_email(self, subject: str, body: str, recipient_email: str):
         if (

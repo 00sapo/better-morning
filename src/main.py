@@ -127,6 +127,11 @@ async def main():
     all_summarized_articles = [
         article for _, _, articles in collection_results for article in articles
     ]
+    skipped_sources = set()
+    for _, _, articles in collection_results:
+        for article in articles:
+            if article.source_url and str(article.source_url) in skipped_sources:
+                skipped_sources.add(str(article.source_url))
 
     final_overview = "No articles were summarized today."
     if all_summarized_articles:
@@ -146,7 +151,7 @@ async def main():
     today = datetime.now(timezone.utc)
     document_generator = DocumentGenerator(global_config.output_settings, global_config)
     final_markdown_digest = document_generator.generate_markdown_digest(
-        final_overview, articles_by_collection, today
+        final_overview, articles_by_collection, list(skipped_sources), today
     )
 
     # 5. Output the digest based on global settings
