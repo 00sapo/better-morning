@@ -108,12 +108,15 @@ For the GitHub Action to function, you need to configure secrets in your reposit
     - `BETTER_MORNING_SMTP_PASSWORD`: (Optional, if using email output) Your SMTP password or app-specific password.
     - `GITHUB_TOKEN`: This is automatically provided by GitHub Actions for creating releases, so you generally don't need to set it manually unless you need extended permissions. Ensure your repository's `Settings > Actions > General > Workflow permissions` are set appropriately (e.g., `Read and write permissions`).
 
-## ⚙️ GitHub Action
+## 5. Set Up GitHub Action
 
 The `.github/workflows/daily_digest.yml` file defines the GitHub Action that runs your daily digest generation.
 
 - **Trigger**: It's set to run daily at 07:30 UTC and can also be triggered manually via `workflow_dispatch`.
 - **Steps**: It checks out your code, sets up Python with `uv`, installs dependencies, and executes `src/main.py`.
+
+You need to set the cron schedule and the branch for running it (see line `branch: personal`) in the
+workflow file.
 
 ## 📝 Output Options
 
