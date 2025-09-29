@@ -1,8 +1,10 @@
 from typing import Optional, List
 import litellm
+import os
 
-from .config import LLMSettings, GlobalConfig
+from .config import LLMSettings, GlobalConfig, get_secret
 from .rss_fetcher import Article
+
 
 # Rough estimate: 1 token = 4 characters (common for English text)
 TOKEN_TO_CHAR_RATIO = 4
@@ -12,6 +14,22 @@ class LLMSummarizer:
     def __init__(self, settings: LLMSettings, global_config: GlobalConfig):
         self.settings = settings
         self.global_config = global_config
+        # Ensure the API key is loaded from the environment if not already set
+        if not self.settings.api_key:
+            try:
+                self.settings.api_key = get_secret(
+                    global_config.llm_api_token_env, "LLM API Key"
+                )
+            except ValueError as e:
+                # This allows for local runs where secrets might not be set up for other purposes.
+                print(f"Warning: {e}")
+                self.settings.api_key = None
+
+    def _get_masked_api_key(self) -> str:
+        """Returns a masked version of the API key for debugging."""
+        if self.settings.api_key:
+            return f"{self.settings.api_key[:4]}...{self.settings.api_key[-4:]}"
+        return "None"
 
     def _truncate_text_to_token_limit(
         self, text: str, token_limit: int
@@ -39,12 +57,10 @@ class LLMSummarizer:
         final_prompt_template = prompt_override or self.settings.prompt_template
 
         # Construct the message payload for litellm
-        # This now supports multimodal content (e.g., text and PDF)
         messages = []
         if article.content_type == "application/pdf" and article.raw_content:
             # Multimodal message for models that support it (like GPT-4o)
             print(f"Preparing multimodal summary request for PDF: {article.title}")
-            # The text part of the prompt can be simpler, as the main content is the PDF
             text_prompt = (
                 f"Please summarize the attached PDF document titled '{article.title}' "
                 f"in approximately {self.settings.k_words_each_summary} words. "
@@ -55,14 +71,10 @@ class LLMSummarizer:
                     "role": "user",
                     "content": [
                         {"type": "text", "text": text_prompt},
-                        # litellm expects a dictionary for image/pdf inputs
                         {"type": "pdf", "pdf": article.raw_content},
                     ],
                 }
             ]
-            # For multimodal, we don't truncate the (binary) content, but we ensure the text prompt isn't excessively long.
-            # We assume the model's context window is large enough for the PDF.
-            # A simple check on the text part:
             truncated_prompt_text, was_truncated = self._truncate_text_to_token_limit(
                 text_prompt, self.global_config.token_size_threshold
             )
@@ -70,7 +82,6 @@ class LLMSummarizer:
                 print(
                     f"Warning: Text part of multimodal prompt for '{article.title}' was truncated."
                 )
-                # Rebuild message with truncated text
                 messages[0]["content"][0]["text"] = truncated_prompt_text
 
         else:  # Default to text-based summarization
@@ -78,7 +89,7 @@ class LLMSummarizer:
                 prompt = final_prompt_template.format(
                     title=article.title,
                     content=article.content,
-                    k_words=self.settings.k_words_each_summary,
+                    k_words_each_summary=self.settings.k_words_each_summary,
                 )
             else:
                 # Default prompt if no template is provided
@@ -89,52 +100,40 @@ class LLMSummarizer:
                     f"Article content:\n{article.content}"
                 )
 
-            # Truncate prompt if it's too long
-            truncated_prompt, was_truncated = self._truncate_text_to_token_limit(
+            truncated_prompt, _ = self._truncate_text_to_token_limit(
                 prompt, self.global_config.token_size_threshold
             )
-            if was_truncated:
-                print(
-                    f"Warning: Summarization prompt for '{article.title}' was truncated."
-                )
-
             messages = [{"role": "user", "content": truncated_prompt}]
 
         try:
-            # Ensure we have messages to send
             if not messages:
                 raise ValueError("Message list for LLM completion is empty.")
 
+            print(f"Summarizing '{article.title}' with model '{self.settings.model}'. API Key: {self._get_masked_api_key()}")
             response = litellm.completion(
                 model=self.settings.model,
                 messages=messages,
                 temperature=self.settings.temperature,
                 api_key=self.settings.api_key,
             )
-            article.summary = response.choices[0].message.content
+            summary_text = response.choices[0].message.content
+            article.summary = f"{summary_text.strip()}\n\n[Source]({article.link})"
             return article
         except Exception as e:
             print(f"Error summarizing article '{article.title}' with LLM: {e}")
-            # Fallback for multimodal errors
             if " multimodal " in str(e).lower():
-                article.summary = "[Error: Could not summarize the provided document with the current model. It may not support this file type.]"
+                article.summary = f"[Error: Could not summarize the provided document.]\n\n[Source]({article.link})"
             else:
-                article.summary = "[Error: Could not summarize article]"
+                article.summary = f"[Error: Could not summarize article.]\n\n[Source]({article.link})"
             return article
 
     def _summarize_text_content(
         self, text_content: str, prompt: str, title: str = "Untitled"
     ) -> str:
         """Helper to summarize raw text content using the configured LLM."""
-        # Truncate prompt if it's too long
-        truncated_prompt, was_truncated = self._truncate_text_to_token_limit(
+        truncated_prompt, _ = self._truncate_text_to_token_limit(
             prompt, self.global_config.token_size_threshold
         )
-        if was_truncated:
-            print(
-                f"Warning: Summarization prompt for text content '{title}' was truncated."
-            )
-
         messages = [{"role": "user", "content": truncated_prompt}]
 
         try:
@@ -151,60 +150,57 @@ class LLMSummarizer:
 
     async def summarize_articles_collection(
         self, articles: List[Article], collection_prompt: Optional[str] = None
-    ) -> str:
+    ) -> tuple[str, List[Article]]:
         if not articles:
-            return "No articles to summarize for this collection."
+            return "No articles to summarize for this collection.", []
 
         # 1. Summarize each individual article
-        summarized_articles: List[Article] = []
+        tasks = []
         for article in articles:
-            # Ensure summary exists. If content is raw (PDF), this will trigger multimodal summarization.
             if not article.summary:
-                summarized_articles.append(self.summarize_text(article))
+                tasks.append(self.summarize_text(article))
             else:
-                summarized_articles.append(article)
+                tasks.append(article)
+        
+        summarized_articles: List[Article] = tasks
 
-        # Filter out articles that couldn't be summarized
         effectively_summarized_articles = [
-            a
-            for a in summarized_articles
-            if a.summary and not a.summary.startswith("[Error:")
+            a for a in summarized_articles if a.summary and not a.summary.startswith("[Error:")
         ]
 
         if not effectively_summarized_articles:
-            return "No articles with valid summaries to process for the collection summary."
+            return "No articles with valid summaries.", []
 
-        # Concatenate all available summaries for the LLM to evaluate
         concatenated_summaries = "\n\n".join(
             [
-                f"Title: {art.title}\nSummary: {art.summary}"
+                f"Title: {art.title}\nLink: {art.link}\nSummary: {art.summary}"
                 for art in effectively_summarized_articles
             ]
         )
 
         if not concatenated_summaries:
-            return "No content available for collection summary."
+            return "No content available for collection summary.", effectively_summarized_articles
 
-        # 2. Build the final prompt, ensuring the core instruction is always present.
-        # The user's custom prompt will be integrated as an additional guideline.
+        # 2. Build the final prompt for the collection overview
         user_guideline = ""
         if collection_prompt:
-            user_guideline = f"Additionally, please follow this specific guideline when summarizing: '{collection_prompt}'"
+            user_guideline = f"Additionally, please follow this specific guideline: '{collection_prompt}'"
 
         collection_summary_prompt = (
             f"From the following list of article summaries, please identify the {self.settings.n_most_important_news} "
             f"most important news stories. Then, write a cohesive and concise summary of those top stories for a daily news digest. "
             f"The final summary should be approximately {self.settings.k_words_each_summary * self.settings.n_most_important_news} words. "
             f"The final summary must be in {self.settings.output_language}. "
+            f"**Crucially, for every piece of information you include, you MUST cite the source using a Markdown link like this: [Source](Link).** "
             f"Highlight the main themes and most significant events. {user_guideline}\n\n"
             f"Here are the summaries:\n{concatenated_summaries}"
         )
 
-        # Use the new helper to summarize the concatenated text directly
         final_summary = self._summarize_text_content(
             text_content=concatenated_summaries,
             prompt=collection_summary_prompt,
             title="Daily Digest Collection Summary",
         )
 
-        return final_summary or "Could not generate collection summary."
+        return final_summary or "Could not generate collection summary.", effectively_summarized_articles
+

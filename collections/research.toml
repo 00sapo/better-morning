@@ -3,7 +3,7 @@ name = "Research"
 [[feeds]]
 url = "https://www.sciencedaily.com/rss/top/science.xml"
 name = "Science Daily Top"
-max_articles = 30
+max_articles = 5
 
 [[feeds]]
 url = "https://www.sciencedaily.com/rss/science_society/urbanization.xml"
@@ -18,24 +18,24 @@ max_articles = 5
 [[feeds]]
 url = "https://phys.org/rss-feed/"
 name = "Phys.org"
-max_articles = 20
+max_articles = 5
 
 [[feeds]]
 url = "https://techxplore.com/rss-feed/"
 name = "TechXplore"
-max_articles = 20
+max_articles = 5
 
 [[feeds]]
 url = "https://kill-the-newsletter.com/feeds/xxny2shtt9urp5ws8yps.xml"
 name = "Nature News"
-max_articles = 10
+max_articles = 5
 
 [llm_settings]
 n_most_important_news = 3
 k_words_each_summary = 150
 
 [content_extraction_settings]
-follow_article_links = true
+follow_article_links = false
 parser_type = "html.parser"
 
 collection_prompt = "Crea una panoramica completa ma concisa delle notizie, prospettive, e opinioni presentate in questi articoli. Presta particolare attenzione alle notizie riguardanti i l'informatica, le reti neurali, la musica, i paesaggi sonori e l'urbanistica."

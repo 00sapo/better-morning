@@ -13,4 +13,4 @@ k_words_each_summary = 150
 follow_article_links = true
 parser_type = "html.parser"
 
-collection_prompt = "Crea una panoramica completa ma concisa degli articoli scientifici e delle ricerche presentate in questi articoli."
+collection_prompt = "Crea una panoramica completa ma concisa degli articoli scientifici e delle ricerche presentate in questi articoli. Tralascia le notifiche ricevute via email."

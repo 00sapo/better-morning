@@ -79,9 +79,19 @@ def load_global_config(path: str = GLOBAL_CONFIG_FILE) -> GlobalConfig:
             print(
                 f"Warning: Global config file '{path}' not found. Using default global settings."
             )
-            return GlobalConfig()
-        data = toml.load(path)
-        return GlobalConfig(**data)
+            config = GlobalConfig()
+        else:
+            data = toml.load(path)
+            config = GlobalConfig(**data)
+
+        # After loading, immediately try to resolve the API key
+        try:
+            api_key = get_secret(config.llm_api_token_env, "Global LLM API Key")
+            config.llm_settings.api_key = api_key
+        except ValueError as e:
+            print(f"Warning: Could not resolve the global LLM API key. LLM calls may fail. Error: {e}")
+
+        return config
     except Exception as e:
         print(f"Error loading or validating global config from {path}: {e}")
         raise

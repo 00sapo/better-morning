@@ -13,6 +13,7 @@ class Article(BaseModel):
     id: str  # Unique identifier, e.g., link
     title: str
     link: HttpUrl
+    source_url: HttpUrl = None
     published_date: datetime
     summary: Optional[str] = None
     content: Optional[str] = None  # For text-based content
@@ -145,6 +146,7 @@ class RSSFetcher:
                         id=article_id,
                         title=entry.title,
                         link=HttpUrl(article_link),
+                        source_url=feed_config.url,
                         published_date=published_date,
                         summary=entry.get("summary"),  # RSS often contains a summary
                     )

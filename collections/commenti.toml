@@ -35,7 +35,7 @@ n_most_important_news = 2
 k_words_each_summary = 200
 
 [content_extraction_settings]
-follow_article_links = true
+follow_article_links = false
 parser_type = "html.parser"
 
 collection_prompt = "Fornisci una panoramica completa ma concisa delle notizie, opinioni, commenti e prospettive presentate in questi articoli."

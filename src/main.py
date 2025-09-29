@@ -9,7 +9,7 @@ from better_morning.config import (
     load_collection,
     GlobalConfig,
 )
-from better_morning.rss_fetcher import RSSFetcher
+from better_morning.rss_fetcher import RSSFetcher, Article
 from better_morning.content_extractor import ContentExtractor
 from better_morning.llm_summarizer import LLMSummarizer
 from better_morning.document_generator import DocumentGenerator
@@ -17,12 +17,15 @@ from better_morning.document_generator import DocumentGenerator
 
 async def process_collection(
     collection_path: str, global_config: GlobalConfig
-) -> tuple[str, str]:
-    """Processes a single news collection: fetches, extracts, summarizes, and returns its digest."""
+) -> tuple[str, str, List[Article]]:
+    """
+    Processes a single news collection: fetches, extracts, summarizes.
+    Returns the collection name, its summary, and the list of summarized articles.
+    """
     print(f"\n--- Processing collection: {collection_path} ---")
     collection_config = load_collection(collection_path, global_config)
 
-    # Initialize components with collection-specific or merged settings
+    # Initialize components
     rss_fetcher = RSSFetcher(feeds=collection_config.feeds)
     content_extractor = ContentExtractor(
         settings=collection_config.content_extraction_settings
@@ -32,46 +35,67 @@ async def process_collection(
     )
 
     try:
-        # Start the browser for content extraction
         await content_extractor.start_browser()
 
         # 1. Fetch new RSS articles
         new_articles = rss_fetcher.fetch_articles(collection_config.name)
         print(f"Found {len(new_articles)} new articles for {collection_config.name}.")
-
         if not new_articles:
-            return (
-                collection_config.name,
-                "No new articles found for this collection today.\n",
-            )
+            return collection_config.name, "No new articles found.", []
 
-        # 2. Extract content for new articles concurrently
+        # 2. Extract content
         content_extraction_tasks = [
             content_extractor.get_content(article) for article in new_articles
         ]
         processed_articles = await asyncio.gather(*content_extraction_tasks)
 
+        # Track and filter sources with high failure rates
+        source_stats = {}
+        for article in processed_articles:
+            source_url = str(article.source_url) if article.source_url else "Unknown"
+            if source_url not in source_stats:
+                source_stats[source_url] = {"success": 0, "failure": 0}
+            if article.content:
+                source_stats[source_url]["success"] += 1
+            else:
+                source_stats[source_url]["failure"] += 1
+
+        skipped_sources = set()
+        for source_url, stats in source_stats.items():
+            total_articles = stats["success"] + stats["failure"]
+            if total_articles >= 10 and (stats["failure"] / total_articles) > 0.75:
+                print(
+                    f"Warning: Skipping source {source_url} due to high failure rate."
+                )
+                skipped_sources.add(source_url)
+
         articles_with_content = [
-            article for article in processed_articles if article.content
+            article
+            for article in processed_articles
+            if article.content
+            and (
+                article.source_url is None
+                or str(article.source_url) not in skipped_sources
+            )
         ]
 
         if not articles_with_content:
-            return (
-                collection_config.name,
-                "No articles with extractable content for this collection today.\n",
-            )
+            return collection_config.name, "No articles with extractable content.", []
 
+        # 3. Summarize the collection and individual articles
         print(
             f"Summarizing {len(articles_with_content)} articles for {collection_config.name}..."
         )
-        # 3. Summarize the collection
-        collection_digest_summary = await llm_summarizer.summarize_articles_collection(
-            articles_with_content, collection_prompt=collection_config.collection_prompt
+        (
+            collection_summary,
+            summarized_articles,
+        ) = await llm_summarizer.summarize_articles_collection(
+            articles_with_content,
+            collection_prompt=collection_config.collection_prompt,
         )
 
-        return collection_config.name, collection_digest_summary
+        return collection_config.name, collection_summary, summarized_articles
     finally:
-        # Ensure the browser is closed
         await content_extractor.close_browser()
 
 
@@ -79,44 +103,51 @@ async def main():
     print("Starting better-morning daily digest generation...")
 
     # 1. Load global configuration
-    try:
-        global_config = load_global_config()
-        print("Global configuration loaded successfully.")
-    except Exception as e:
-        print(f"Failed to load global configuration: {e}")
-        return
+    global_config = load_global_config()
+    print("Global configuration loaded successfully.")
 
-    # 2. Find all collection files
+    # 2. Find and process all collections concurrently
     collection_files = glob.glob("collections/*.toml")
     if not collection_files:
-        print(
-            "No collection TOML files found in the 'collections/' directory. Exiting."
-        )
+        print("No collection TOML files found. Exiting.")
         return
 
     print(f"Found {len(collection_files)} collections to process.")
-
-    # 3. Process each collection concurrently
     tasks = [
         process_collection(filepath, global_config) for filepath in collection_files
     ]
-    collection_results: List[tuple[str, str]] = await asyncio.gather(*tasks)
+    collection_results: List[tuple[str, str, List[Article]]] = await asyncio.gather(
+        *tasks
+    )
 
-    # Aggregate all collection summaries
-    all_collection_summaries: Dict[str, str] = {
-        name: summary for name, summary in collection_results
+    # 3. Aggregate results and generate the final overview
+    articles_by_collection: Dict[str, List[Article]] = {
+        name: articles for name, _, articles in collection_results
     }
+    all_summarized_articles = [
+        article for _, _, articles in collection_results for article in articles
+    ]
 
-    # 4. Generate final markdown digest
+    final_overview = "No articles were summarized today."
+    if all_summarized_articles:
+        print("\n--- Generating Final Overview ---")
+        # Use the global LLM settings for the final summary
+        final_summarizer = LLMSummarizer(
+            settings=global_config.llm_settings, global_config=global_config
+        )
+        # We call summarize_articles_collection again, but this time on ALL articles
+        # to get the final, cross-collection overview.
+        final_overview, _ = await final_summarizer.summarize_articles_collection(
+            all_summarized_articles,
+            collection_prompt="Create a cohesive overview of the most important news from all the provided summaries. Focus on cross-collection themes if any.",
+        )
+
+    # 4. Generate and output the final markdown digest
     today = datetime.now(timezone.utc)
     document_generator = DocumentGenerator(global_config.output_settings, global_config)
     final_markdown_digest = document_generator.generate_markdown_digest(
-        all_collection_summaries, today
+        final_overview, articles_by_collection, today
     )
-
-    print("\n--- Generated Final Daily Digest ---\n")
-    print(final_markdown_digest)
-    print("\n--- End of Digest ---\n")
 
     # 5. Output the digest based on global settings
     output_type = global_config.output_settings.output_type

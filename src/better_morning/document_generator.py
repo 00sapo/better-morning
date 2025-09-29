@@ -2,11 +2,16 @@ import requests
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import Dict
+from typing import Dict, List
 from datetime import datetime
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+import requests
 import markdown2
 
 from .config import OutputSettings, GlobalConfig, get_secret
+from .rss_fetcher import Article
 
 
 class DocumentGenerator:
@@ -15,19 +20,30 @@ class DocumentGenerator:
         self.global_config = global_config
 
     def generate_markdown_digest(
-        self, collection_summaries: Dict[str, str], date: datetime
+        self,
+        overview: str,
+        articles_by_collection: Dict[str, List[Article]],
+        date: datetime,
     ) -> str:
-        if not collection_summaries:
-            return "# Daily News Digest\n\nNo news to report for today.\n"
+        """Formats the digest with a top-level overview and detailed summaries."""
+        title = f"# Daily Digest - {date.strftime('%Y-%m-%d')}"
+        overview_section = f"## General Overview\n\n{overview}"
 
-        digest_content = f"# Daily News Digest - {date.strftime('%Y-%m-%d')}\n\n"
+        detailed_sections = ["## Detailed Summaries"]
+        for collection_name, articles in articles_by_collection.items():
+            # Filter out articles that might have failed summarization
+            valid_articles = [
+                a for a in articles if a.summary and not a.summary.startswith("[Error:")
+            ]
+            if not valid_articles:
+                continue
 
-        for collection_name, summary in collection_summaries.items():
-            digest_content += f"## {collection_name}\n\n"
-            digest_content += f"{summary}\n\n"
-            digest_content += "---\n\n"  # Separator for collections
+            detailed_sections.append(f"\n### Collection: {collection_name}\n")
+            for article in valid_articles:
+                detailed_sections.append(f"#### {article.title}\n")
+                detailed_sections.append(f"{article.summary}\n")
 
-        return digest_content
+        return "\n".join([title, overview_section, "---"] + detailed_sections)
 
     def send_via_email(self, subject: str, body: str, recipient_email: str):
         if (

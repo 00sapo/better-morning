@@ -30,7 +30,7 @@ n_most_important_news = 2
 k_words_each_summary = 150
 
 [content_extraction_settings]
-follow_article_links = true
+follow_article_links = false
 parser_type = "html.parser"
 
 collection_prompt = "Crea una panoramica completa ma concisa delle notizie, prospettive, e opinioni presentate in questi articoli. Presta particolare attenzione alle notizie riguardanti i post-dottorati, assegni e incarichi di ricerca, bandi per progetti di ricerca, e riforme del sistema universitario."
