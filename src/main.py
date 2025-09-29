@@ -17,10 +17,10 @@ from better_morning.document_generator import DocumentGenerator
 
 async def process_collection(
     collection_path: str, global_config: GlobalConfig
-) -> tuple[str, str, List[Article]]:
+) -> tuple[str, str, List[Article], List[str]]:
     """
     Processes a single news collection: fetches, extracts, summarizes.
-    Returns the collection name, its summary, and the list of summarized articles.
+    Returns the collection name, its summary, the list of summarized articles, and a list of skipped sources.
     """
     print(f"\n--- Processing collection: {collection_path} ---")
     collection_config = load_collection(collection_path, global_config)
@@ -34,6 +34,8 @@ async def process_collection(
         settings=collection_config.llm_settings, global_config=global_config
     )
 
+    skipped_sources = set()
+
     try:
         await content_extractor.start_browser()
 
@@ -41,7 +43,7 @@ async def process_collection(
         new_articles = rss_fetcher.fetch_articles(collection_config.name)
         print(f"Found {len(new_articles)} new articles for {collection_config.name}.")
         if not new_articles:
-            return collection_config.name, "No new articles found.", []
+            return collection_config.name, "No new articles found.", [], []
 
         # 2. Extract content
         content_extraction_tasks = [
@@ -55,12 +57,13 @@ async def process_collection(
             source_url = str(article.source_url) if article.source_url else "Unknown"
             if source_url not in source_stats:
                 source_stats[source_url] = {"success": 0, "failure": 0}
-            if article.content:
+            
+            # Content is defined as having either text content or raw_content (for PDFs)
+            if article.content or article.raw_content:
                 source_stats[source_url]["success"] += 1
             else:
                 source_stats[source_url]["failure"] += 1
 
-        skipped_sources = set()
         for source_url, stats in source_stats.items():
             total_articles = stats["success"] + stats["failure"]
             if total_articles >= 10 and (stats["failure"] / total_articles) > 0.75:
@@ -72,7 +75,7 @@ async def process_collection(
         articles_with_content = [
             article
             for article in processed_articles
-            if article.content
+            if (article.content or article.raw_content)
             and (
                 article.source_url is None
                 or str(article.source_url) not in skipped_sources
@@ -80,7 +83,7 @@ async def process_collection(
         ]
 
         if not articles_with_content:
-            return collection_config.name, "No articles with extractable content.", []
+            return collection_config.name, "No articles with extractable content.", [], list(skipped_sources)
 
         # 3. Summarize the collection and individual articles
         print(
@@ -94,7 +97,7 @@ async def process_collection(
             collection_prompt=collection_config.collection_prompt,
         )
 
-        return collection_config.name, collection_summary, summarized_articles
+        return collection_config.name, collection_summary, summarized_articles, list(skipped_sources)
     finally:
         await content_extractor.close_browser()
 
@@ -116,28 +119,22 @@ async def main():
     tasks = [
         process_collection(filepath, global_config) for filepath in collection_files
     ]
-    collection_results: List[tuple[str, str, List[Article]]] = await asyncio.gather(
+    collection_results: List[tuple[str, str, List[Article], List[str]]] = await asyncio.gather(
         *tasks
     )
 
     # 3. Aggregate results
     collection_summaries: Dict[str, str] = {
-        name: summary for name, summary, _ in collection_results
+        name: summary for name, summary, _, _ in collection_results
     }
     articles_by_collection: Dict[str, List[Article]] = {
-        name: articles for name, _, articles in collection_results
+        name: articles for name, _, articles, _ in collection_results
     }
-    all_articles = [
-        article for _, _, articles in collection_results for article in articles
-    ]
-
+    
     # Collect all unique skipped sources from all processing runs
     skipped_sources = set()
-    for article in all_articles:
-        # This logic assumes that if a source was skipped, its articles won't appear here.
-        # A better approach would be to return the skipped_sources set from process_collection.
-        # For now, we'll rebuild it, but this could be optimized.
-        pass  # The logic for skipped sources needs to be gathered from results.
+    for _, _, _, sources in collection_results:
+        skipped_sources.update(sources)
 
     # 4. Generate and output the final markdown digest
     today = datetime.now(timezone.utc)

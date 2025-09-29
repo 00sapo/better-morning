@@ -61,9 +61,20 @@ class ContentExtractor:
             return None
 
     async def get_content(self, article: Article) -> Article:
+        # If follow_article_links is False, only use RSS summary
+        if not self.settings.follow_article_links:
+            print(
+                f"Info: Using RSS summary for '{article.title}' (follow_article_links=False)."
+            )
+            article.content = article.summary or ""
+            article.content_type = "text/plain"
+            return article
+
         # If summary is long enough, use it without fetching
         if article.summary and len(article.summary.split()) > 400:
-            print(f"Info: Using RSS summary for '{article.title}' as it's over 400 words.")
+            print(
+                f"Info: Using RSS summary for '{article.title}' as it's over 400 words."
+            )
             article.content = article.summary
             article.content_type = "text/plain"
             return article
@@ -91,30 +102,21 @@ class ContentExtractor:
                 raise RuntimeError("Browser not started. Call start_browser() first.")
             try:
                 page = await self.browser.new_page(user_agent=self.user_agent)
-                print(f"Fetching content with Playwright for: {article.title} from {article.link}")
+                print(
+                    f"Fetching content with Playwright for: {article.title} from {article.link}"
+                )
                 await page.goto(str(article.link), timeout=30000)
                 html_content = await page.content()
                 await page.close()
             except Exception as e:
                 print(f"Error fetching article with Playwright {article.link}: {e}")
-                html_content = None # Ensure html_content is None on failure
+                html_content = None  # Ensure html_content is None on failure
 
         if not html_content:
-            article.content = article.summary # Fallback to summary if all fetching fails
+            article.content = (
+                article.summary
+            )  # Fallback to summary if all fetching fails
             return article
-
-        # Debug: Save HTML content to a file
-        debug_dir = "debug"
-        os.makedirs(debug_dir, exist_ok=True)
-        sanitized_title = re.sub(r'[^\w\s-]', '', article.title).strip()
-        sanitized_title = re.sub(r'[-\s]+', '-', sanitized_title)
-        filename = f"{debug_dir}/debug_{sanitized_title[:50]}.html"
-        try:
-            with open(filename, "w", encoding="utf-8") as f:
-                f.write(html_content)
-            print(f"Debug HTML for '{article.title}' saved to {filename}")
-        except Exception as e:
-            print(f"Error writing debug file for '{article.title}': {e}")
 
         # Extract text from the main article
         main_text_content = self._extract_from_html(html_content)
@@ -125,11 +127,13 @@ class ContentExtractor:
             print(f"Following links for '{article.title}'...")
             soup = BeautifulSoup(html_content, "html.parser")
             links_to_follow = []
-            
+
             # Use the final URL from the response to resolve relative links correctly
             base_url = str(response.url) if response else str(article.link)
 
-            for a_tag in soup.find_all("a", href=True, limit=25): # Increased limit to find more potential matches
+            for a_tag in soup.find_all(
+                "a", href=True, limit=25
+            ):  # Increased limit to find more potential matches
                 href = a_tag["href"]
                 abs_url = urljoin(base_url, href)
 
@@ -150,11 +154,15 @@ class ContentExtractor:
                     # If no pattern, follow all valid links
                     links_to_follow.append(abs_url)
 
-            unique_links = list(dict.fromkeys(links_to_follow))[:5] # Limit to 5 unique links to avoid excessive requests
+            unique_links = list(dict.fromkeys(links_to_follow))[
+                :5
+            ]  # Limit to 5 unique links to avoid excessive requests
             for link in unique_links:
                 print(f"  -> Fetching sub-link: {link}")
                 sub_response = await self._fetch_with_requests(link)
-                if sub_response and "application/pdf" not in sub_response.headers.get("Content-Type", ""):
+                if sub_response and "application/pdf" not in sub_response.headers.get(
+                    "Content-Type", ""
+                ):
                     sub_html_content = sub_response.text
                     sub_text_content = self._extract_from_html(sub_html_content)
                     if sub_text_content:

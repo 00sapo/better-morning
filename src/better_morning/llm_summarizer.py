@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional, List
 import litellm
 import os
@@ -44,7 +45,7 @@ class LLMSummarizer:
             return text[:char_limit], True
         return text, False
 
-    def summarize_text(
+    async def summarize_text(
         self, article: Article, prompt_override: Optional[str] = None
     ) -> Article:
         if not article.content and not article.raw_content:
@@ -110,11 +111,12 @@ class LLMSummarizer:
                 raise ValueError("Message list for LLM completion is empty.")
 
             print(f"Summarizing '{article.title}' with model '{self.settings.model}'. API Key: {self._get_masked_api_key()}")
-            response = litellm.completion(
+            response = await litellm.acompletion(
                 model=self.settings.model,
                 messages=messages,
                 temperature=self.settings.temperature,
                 api_key=self.settings.api_key,
+                timeout=120,  # Add a 2-minute timeout
             )
             summary_text = response.choices[0].message.content
             article.summary = f"{summary_text.strip()}\n\n[Source]({article.link})"
@@ -127,7 +129,7 @@ class LLMSummarizer:
                 article.summary = f"[Error: Could not summarize article.]\n\n[Source]({article.link})"
             return article
 
-    def _summarize_text_content(
+    async def _summarize_text_content(
         self, text_content: str, prompt: str, title: str = "Untitled"
     ) -> str:
         """Helper to summarize raw text content using the configured LLM."""
@@ -137,11 +139,12 @@ class LLMSummarizer:
         messages = [{"role": "user", "content": truncated_prompt}]
 
         try:
-            response = litellm.completion(
+            response = await litellm.acompletion(
                 model=self.settings.model,
                 messages=messages,
                 temperature=self.settings.temperature,
                 api_key=self.settings.api_key,
+                timeout=120,  # Add a 2-minute timeout
             )
             return response.choices[0].message.content or ""
         except Exception as e:
@@ -154,15 +157,20 @@ class LLMSummarizer:
         if not articles:
             return "No articles to summarize for this collection.", []
 
-        # 1. Summarize each individual article
+        # 1. Summarize each individual article concurrently
+        articles_to_summarize = [a for a in articles if not a.summary]
+        already_summarized = [a for a in articles if a.summary]
+
         tasks = []
-        for article in articles:
-            if not article.summary:
+        if articles_to_summarize:
+            print(f"Summarizing {len(articles_to_summarize)} individual articles...")
+            for article in articles_to_summarize:
                 tasks.append(self.summarize_text(article))
-            else:
-                tasks.append(article)
-        
-        summarized_articles: List[Article] = tasks
+            
+            newly_summarized = await asyncio.gather(*tasks)
+            summarized_articles = already_summarized + newly_summarized
+        else:
+            summarized_articles = already_summarized
 
         effectively_summarized_articles = [
             a for a in summarized_articles if a.summary and not a.summary.startswith("[Error:")
@@ -196,7 +204,7 @@ class LLMSummarizer:
             f"Here are the summaries:\n{concatenated_summaries}"
         )
 
-        final_summary = self._summarize_text_content(
+        final_summary = await self._summarize_text_content(
             text_content=concatenated_summaries,
             prompt=collection_summary_prompt,
             title="Daily Digest Collection Summary",

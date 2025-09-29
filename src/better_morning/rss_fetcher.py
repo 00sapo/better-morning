@@ -142,13 +142,21 @@ class RSSFetcher:
                         )
                         published_date = datetime.now(timezone.utc)
 
+                    # Prioritize 'content' over 'summary' if available, as it's often the full article.
+                    # feedparser returns a list of content objects; we take the first one.
+                    content_html = ""
+                    if "content" in entry and entry.content:
+                        content_html = entry.content[0].value
+                    
+                    summary_text = content_html or entry.get("summary")
+
                     article = Article(
                         id=article_id,
                         title=entry.title,
                         link=HttpUrl(article_link),
                         source_url=feed_config.url,
                         published_date=published_date,
-                        summary=entry.get("summary"),  # RSS often contains a summary
+                        summary=summary_text,
                     )
                     new_articles.append(article)
                     all_fetched_articles_for_history.append(
