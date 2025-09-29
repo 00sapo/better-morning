@@ -134,7 +134,7 @@ class LLMSummarizer:
             return article
 
     async def _summarize_text_content(
-        self, text_content: str, prompt: str, title: str = "Untitled"
+        self, text_content: str, prompt: str, title: str = "Untitled", timeout=120
     ) -> str:
         """Helper to summarize raw text content using the configured LLM."""
         truncated_prompt, _ = self._truncate_text_to_token_limit(
@@ -148,7 +148,7 @@ class LLMSummarizer:
                 messages=messages,
                 temperature=self.settings.temperature,
                 api_key=self.settings.api_key,
-                timeout=120,  # Add a 2-minute timeout
+                timeout=timeout,  # Add a 2-minute timeout
             )
             return response.choices[0].message.content or ""
         except Exception as e:
@@ -210,6 +210,7 @@ class LLMSummarizer:
             text_content=concatenated_summaries,
             prompt=collection_summary_prompt,
             title="Daily Digest Collection Summary",
+            timeout=300,
         )
 
         return (
