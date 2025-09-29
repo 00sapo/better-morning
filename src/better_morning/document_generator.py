@@ -42,7 +42,7 @@ class DocumentGenerator:
             for source in skipped_sources:
                 skipped_sources_section += f"- {source}\n"
 
-        detailed_sections = ["\n## Detailed Summaries"]
+        detailed_sections = ["\n\n## Detailed Summaries"]
         for collection_name, articles in articles_by_collection.items():
             # Filter out articles that might have failed summarization
             valid_articles = [

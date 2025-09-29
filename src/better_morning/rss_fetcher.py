@@ -65,6 +65,20 @@ class RSSFetcher:
         with open(history_file, "w") as f:
             json.dump(articles_to_save, f, cls=ArticleEncoder, indent=4)
 
+    def save_selected_articles_to_history(self, collection_name: str, selected_articles: List[Article]):
+        """Save only the selected articles to history, merging with existing historical articles."""
+        historical_articles = self._load_historical_articles(collection_name)
+        
+        # Create a dictionary of existing articles by ID
+        all_articles = {article.id: article for article in historical_articles}
+        
+        # Add the selected articles to the dictionary (will overwrite if same ID)
+        for article in selected_articles:
+            all_articles[article.id] = article
+        
+        # Save the merged list
+        self._save_articles_to_history(collection_name, list(all_articles.values()))
+
     def fetch_articles(self, collection_name: str) -> List[Article]:
         new_articles: List[Article] = []
         historical_articles = {
@@ -82,27 +96,30 @@ class RSSFetcher:
                     str(feed_config.url)
                 )  # Convert HttpUrl to string
 
-                # Limit the number of entries if max_articles is set for the feed
+                # Filter out articles that are already in history, then apply max_articles limit
                 entries = feed.entries
+                available_entries = []
+                
+                for entry in entries:
+                    article_id = entry.link  # Using link as a unique ID
+                    # Skip articles already in history (previously selected)
+                    if article_id not in historical_articles:
+                        available_entries.append(entry)
+                
+                # Now apply max_articles limit to the filtered entries
                 if (
                     feed_config.max_articles is not None
                     and feed_config.max_articles > 0
+                    and len(available_entries) > feed_config.max_articles
                 ):
                     print(
-                        f"Limiting to the latest {feed_config.max_articles} articles for this feed."
+                        f"Limiting to the latest {feed_config.max_articles} new articles for this feed (excluding previously selected)."
                     )
-                    entries = feed.entries[: feed_config.max_articles]
+                    available_entries = available_entries[:feed_config.max_articles]
 
-                for entry in entries:
+                for entry in available_entries:
                     article_link = entry.link
                     article_id = article_link  # Using link as a unique ID for now
-
-                    # If the article is already in history, skip it
-                    if article_id in historical_articles:
-                        # Update existing article in history if any fields might have changed (e.g. summary from default to actual)
-                        # For now, we assume content is fetched later.
-                        # We can decide later if we want to update other fields here or only add new.
-                        continue
 
                     published_parsed = entry.get("published_parsed")
                     published_date = None
@@ -166,8 +183,5 @@ class RSSFetcher:
             except Exception as e:
                 print(f"Error fetching feed {feed_config.name}: {e}")
 
-        # Save all fetched articles (including historical and new ones)
-        self._save_articles_to_history(
-            collection_name, all_fetched_articles_for_history
-        )
+        # Don't save articles to history here - let the caller decide which articles to save
         return new_articles

@@ -110,7 +110,9 @@ class LLMSummarizer:
             if not messages:
                 raise ValueError("Message list for LLM completion is empty.")
 
-            print(f"Summarizing '{article.title}' with model '{self.settings.model}'. API Key: {self._get_masked_api_key()}")
+            print(
+                f"Summarizing '{article.title}' with model '{self.settings.model}'. API Key: {self._get_masked_api_key()}"
+            )
             response = await litellm.acompletion(
                 model=self.settings.model,
                 messages=messages,
@@ -126,7 +128,9 @@ class LLMSummarizer:
             if " multimodal " in str(e).lower():
                 article.summary = f"[Error: Could not summarize the provided document.]\n\n[Source]({article.link})"
             else:
-                article.summary = f"[Error: Could not summarize article.]\n\n[Source]({article.link})"
+                article.summary = (
+                    f"[Error: Could not summarize article.]\n\n[Source]({article.link})"
+                )
             return article
 
     async def _summarize_text_content(
@@ -161,12 +165,14 @@ class LLMSummarizer:
         # 1. Generate LLM summaries for all articles
         # Note: Articles coming from RSS always have some summary, but we want LLM summaries for the digest
         print(f"Generating LLM summaries for all {len(articles)} articles...")
-        
+
         tasks = [self.summarize_text(article) for article in articles]
         summarized_articles = await asyncio.gather(*tasks)
 
         effectively_summarized_articles = [
-            a for a in summarized_articles if a.summary and not a.summary.startswith("[Error:")
+            a
+            for a in summarized_articles
+            if a.summary and not a.summary.startswith("[Error:")
         ]
 
         if not effectively_summarized_articles:
@@ -180,7 +186,10 @@ class LLMSummarizer:
         )
 
         if not concatenated_summaries:
-            return "No content available for collection summary.", effectively_summarized_articles
+            return (
+                "No content available for collection summary.",
+                effectively_summarized_articles,
+            )
 
         # 2. Build the final prompt for the collection overview
         user_guideline = ""
@@ -189,12 +198,12 @@ class LLMSummarizer:
 
         collection_summary_prompt = (
             f"From the following list of article summaries, please identify the {self.settings.n_most_important_news} "
-            f"most important news stories. Then, write a cohesive and concise summary of those top stories for a daily news digest. "
+            f"most important news stories. Then, write a cohesive and concise summary of those top stories. "
             f"The final summary should be approximately {self.settings.k_words_each_summary * self.settings.n_most_important_news} words. "
             f"The final summary must be in {self.settings.output_language}. "
-            f"**Crucially, for every piece of information you include, you MUST cite the source using a Markdown link like this: [Source](Link).** "
-            f"Highlight the main themes and most significant events. {user_guideline}\n\n"
-            f"Here are the summaries:\n{concatenated_summaries}"
+            f"**Crucially, for every piece of information you include, you MUST cite the source using a Markdown link like this: ([Source](Link)).** "
+            f"{user_guideline}\n\n"
+            f"Answer with only the final summary, without introductions nor conclusions. Here are the summaries:\n{concatenated_summaries}"
         )
 
         final_summary = await self._summarize_text_content(
@@ -203,5 +212,7 @@ class LLMSummarizer:
             title="Daily Digest Collection Summary",
         )
 
-        return final_summary or "Could not generate collection summary.", effectively_summarized_articles
-
+        return (
+            final_summary or "Could not generate collection summary.",
+            effectively_summarized_articles,
+        )

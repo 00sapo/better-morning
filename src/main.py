@@ -98,6 +98,9 @@ async def process_collection(
             collection_prompt=collection_config.collection_prompt,
         )
 
+        # Save only the articles that were successfully processed and summarized to history
+        rss_fetcher.save_selected_articles_to_history(collection_config.name, summarized_articles)
+        
         return collection_config.name, collection_summary, summarized_articles, list(skipped_sources)
     finally:
         await content_extractor.close_browser()
