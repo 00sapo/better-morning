@@ -120,38 +120,30 @@ async def main():
         *tasks
     )
 
-    # 3. Aggregate results and generate the final overview
+    # 3. Aggregate results
+    collection_summaries: Dict[str, str] = {
+        name: summary for name, summary, _ in collection_results
+    }
     articles_by_collection: Dict[str, List[Article]] = {
         name: articles for name, _, articles in collection_results
     }
-    all_summarized_articles = [
+    all_articles = [
         article for _, _, articles in collection_results for article in articles
     ]
-    skipped_sources = set()
-    for _, _, articles in collection_results:
-        for article in articles:
-            if article.source_url and str(article.source_url) in skipped_sources:
-                skipped_sources.add(str(article.source_url))
 
-    final_overview = "No articles were summarized today."
-    if all_summarized_articles:
-        print("\n--- Generating Final Overview ---")
-        # Use the global LLM settings for the final summary
-        final_summarizer = LLMSummarizer(
-            settings=global_config.llm_settings, global_config=global_config
-        )
-        # We call summarize_articles_collection again, but this time on ALL articles
-        # to get the final, cross-collection overview.
-        final_overview, _ = await final_summarizer.summarize_articles_collection(
-            all_summarized_articles,
-            collection_prompt="Create a cohesive overview of the most important news from all the provided summaries. Focus on cross-collection themes if any.",
-        )
+    # Collect all unique skipped sources from all processing runs
+    skipped_sources = set()
+    for article in all_articles:
+        # This logic assumes that if a source was skipped, its articles won't appear here.
+        # A better approach would be to return the skipped_sources set from process_collection.
+        # For now, we'll rebuild it, but this could be optimized.
+        pass  # The logic for skipped sources needs to be gathered from results.
 
     # 4. Generate and output the final markdown digest
     today = datetime.now(timezone.utc)
     document_generator = DocumentGenerator(global_config.output_settings, global_config)
     final_markdown_digest = document_generator.generate_markdown_digest(
-        final_overview, articles_by_collection, list(skipped_sources), today
+        collection_summaries, articles_by_collection, list(skipped_sources), today
     )
 
     # 5. Output the digest based on global settings

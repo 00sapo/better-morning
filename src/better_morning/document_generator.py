@@ -21,14 +21,20 @@ class DocumentGenerator:
 
     def generate_markdown_digest(
         self,
-        overview: str,
+        collection_summaries: Dict[str, str],
         articles_by_collection: Dict[str, List[Article]],
         skipped_sources: List[str],
         date: datetime,
     ) -> str:
         """Formats the digest with a top-level overview and detailed summaries."""
         title = f"# Daily Digest - {date.strftime('%Y-%m-%d')}"
-        overview_section = f"## General Overview\n\n{overview}"
+
+        # Build the General Overview from individual collection summaries
+        overview_parts = ["## General Overview"]
+        for collection_name, summary in collection_summaries.items():
+            overview_parts.append(f"\n### {collection_name}\n")
+            overview_parts.append(summary)
+        overview_section = "\n".join(overview_parts)
 
         skipped_sources_section = ""
         if skipped_sources:
@@ -50,10 +56,13 @@ class DocumentGenerator:
                 detailed_sections.append(f"#### {article.title}\n")
                 detailed_sections.append(f"{article.summary}\n")
 
-        return "\n".join(
-            [title, overview_section, "---", skipped_sources_section, "---"]
-            + detailed_sections
-        )
+        # Assemble the final document
+        final_document_parts = [title, overview_section]
+        if skipped_sources_section:
+            final_document_parts.extend(["---", skipped_sources_section])
+        final_document_parts.extend(["---"] + detailed_sections)
+
+        return "\n".join(final_document_parts)
 
     def send_via_email(self, subject: str, body: str, recipient_email: str):
         if (

@@ -19,6 +19,7 @@ class LLMSettings(BaseModel):
 class ContentExtractionSettings(BaseModel):
     follow_article_links: bool = False
     parser_type: Optional[str] = "html.parser"
+    link_filter_pattern: Optional[str] = None
 
 
 # --- Output Settings ---

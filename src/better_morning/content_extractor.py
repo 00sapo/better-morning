@@ -42,7 +42,7 @@ class ContentExtractor:
         )
         return text_content.strip() if text_content else None
 
-    async def _fetch_with_requests(self, url: str) -> Optional[str]:
+    async def _fetch_with_requests(self, url: str) -> requests.Response:
         """Fetches content using requests, suitable for static pages."""
         try:
             loop = asyncio.get_running_loop()
@@ -55,7 +55,7 @@ class ContentExtractor:
                 ),
             )
             response.raise_for_status()
-            return response.text
+            return response
         except requests.RequestException as e:
             print(f"Info: requests fetch failed for {url}: {e}.")
             return None
@@ -69,9 +69,22 @@ class ContentExtractor:
             return article
 
         # First, try fetching with requests
-        html_content = await self._fetch_with_requests(str(article.link))
+        response = await self._fetch_with_requests(str(article.link))
 
-        # If requests fails, fall back to Playwright
+        if response:
+            content_type = response.headers.get("Content-Type", "")
+            if "application/pdf" in content_type:
+                print(f"PDF content detected for '{article.title}'.")
+                article.raw_content = response.content
+                article.content_type = "application/pdf"
+                # No HTML content to process, so we can return early.
+                return article
+            else:
+                html_content = response.text
+        else:
+            html_content = None
+
+        # If requests fails or content is not PDF, fall back to Playwright for HTML
         if html_content is None:
             print("Falling back to Playwright.")
             if not self.browser:
@@ -112,17 +125,37 @@ class ContentExtractor:
             print(f"Following links for '{article.title}'...")
             soup = BeautifulSoup(html_content, "html.parser")
             links_to_follow = []
-            for a_tag in soup.find_all("a", href=True, limit=15):
+            
+            # Use the final URL from the response to resolve relative links correctly
+            base_url = str(response.url) if response else str(article.link)
+
+            for a_tag in soup.find_all("a", href=True, limit=25): # Increased limit to find more potential matches
                 href = a_tag["href"]
-                abs_url = urljoin(str(article.link), href)
-                if abs_url.startswith("http") and abs_url != str(article.link):
+                abs_url = urljoin(base_url, href)
+
+                # Standard filtering for valid, external links
+                if not abs_url.startswith("http") or abs_url == base_url:
+                    continue
+
+                # If a filter pattern is provided, only follow matching links
+                if self.settings.link_filter_pattern:
+                    if re.search(self.settings.link_filter_pattern, abs_url):
+                        print(f"  -> Link matched filter: {abs_url}")
+                        links_to_follow.append(abs_url)
+                    else:
+                        # Optional: log which links are being skipped for debugging
+                        # print(f"  -> Link skipped (no match): {abs_url}")
+                        pass
+                else:
+                    # If no pattern, follow all valid links
                     links_to_follow.append(abs_url)
 
-            unique_links = list(dict.fromkeys(links_to_follow))[:5]
+            unique_links = list(dict.fromkeys(links_to_follow))[:5] # Limit to 5 unique links to avoid excessive requests
             for link in unique_links:
                 print(f"  -> Fetching sub-link: {link}")
-                sub_html_content = await self._fetch_with_requests(link)
-                if sub_html_content:
+                sub_response = await self._fetch_with_requests(link)
+                if sub_response and "application/pdf" not in sub_response.headers.get("Content-Type", ""):
+                    sub_html_content = sub_response.text
                     sub_text_content = self._extract_from_html(sub_html_content)
                     if sub_text_content:
                         all_text_contents.append(sub_text_content)
