@@ -42,7 +42,7 @@ class DocumentGenerator:
             for source in skipped_sources:
                 skipped_sources_section += f"- {source}\n"
 
-        detailed_sections = ["\n\n## Detailed Summaries"]
+        detailed_sections = ["## Detailed Summaries"]
         for collection_name, articles in articles_by_collection.items():
             # Filter out articles that might have failed summarization
             valid_articles = [
@@ -62,7 +62,7 @@ class DocumentGenerator:
             final_document_parts.extend(["---", skipped_sources_section])
         final_document_parts.extend(["---"] + detailed_sections)
 
-        return "\n".join(final_document_parts)
+        return "\n\n".join(final_document_parts)
 
     def send_via_email(self, subject: str, body: str, recipient_email: str):
         if (

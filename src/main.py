@@ -98,9 +98,6 @@ async def process_collection(
             collection_prompt=collection_config.collection_prompt,
         )
 
-        # Save only the articles that were successfully processed and summarized to history
-        rss_fetcher.save_selected_articles_to_history(collection_config.name, summarized_articles)
-        
         return collection_config.name, collection_summary, summarized_articles, list(skipped_sources)
     finally:
         await content_extractor.close_browser()
@@ -198,6 +195,18 @@ async def main():
         print(
             f"Warning: Unknown output type '{output_type}'. Digest only printed to console."
         )
+
+    # 6. Only save articles to history after digest has been successfully output
+    # This ensures that if any step fails, no articles are marked as processed
+    for collection_file in collection_files:
+        collection_config = load_collection(collection_file, global_config)
+        collection_name = collection_config.name
+        if collection_name in articles_by_collection and articles_by_collection[collection_name]:
+            rss_fetcher = RSSFetcher(feeds=collection_config.feeds)
+            rss_fetcher.save_selected_articles_to_history(
+                collection_name, articles_by_collection[collection_name]
+            )
+            print(f"Saved {len(articles_by_collection[collection_name])} articles to history for {collection_name}")
 
 
 if __name__ == "__main__":

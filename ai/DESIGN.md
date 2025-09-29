@@ -8,8 +8,10 @@ The goal of this project is to create a system that generates a daily news diges
 
 - **RSS Feed Collections**: Users can define multiple collections of RSS feeds.
 - **Configuration**: Each collection is configured using a TOML file.
+- **Smart Article Selection**: The `max_articles` setting per feed selects from only new articles (excluding previously processed ones), ensuring no duplicate processing.
 - **Content Extraction**: The system can extract content from the article's link, handling both HTML pages and PDF documents.
 - **Summarization**: Summaries are generated using an LLM of the user's choice, supported by `litellm`.
+- **Robust History Management**: Articles are only marked as "processed" in history after successful completion of the entire pipeline, preventing data loss on failures.
 - **Automation**: The process is automated using a GitHub Action.
 - **Output**: The final digest can be published as a GitHub release or sent via email.
 
@@ -71,10 +73,10 @@ This module handles fetching RSS feeds, parsing entries, and managing historical
 -   **`Article`**: Pydantic model for a news article. Includes `id`, `title`, `link`, `published_date`, `summary` (from RSS or LLM), `content` (for extracted text), `raw_content` (for binary data like PDFs), and `content_type` (e.g., "application/pdf").
 -   **`ArticleEncoder`**: A custom `json.JSONEncoder` to properly serialize `datetime` and `HttpUrl` objects when saving historical articles.
 -   **`RSSFetcher`**: A class responsible for:
-    -   Loading historical articles from a JSON file (e.g., `history/{collection_name}_articles.json`).
-    -   Fetching articles from configured RSS feeds using `feedparser`. It respects the `max_articles` setting on each feed to limit the number of entries processed.
-    -   Comparing newly fetched articles against historical data to identify and return only new entries.
-    -   Saving all fetched articles (new and existing) back to the history file to maintain state.
+    -   Loading historical articles from a JSON file (e.g., `history/{collection_name}_articles.json`). Historical articles represent previously selected and processed articles.
+    -   Fetching articles from configured RSS feeds using `feedparser`. It respects the `max_articles` setting on each feed, but crucially applies this limit only to articles that haven't been previously selected (not in history).
+    -   Comparing newly fetched articles against historical data to identify and return only new entries that haven't been processed before.
+    -   **`save_selected_articles_to_history()`**: A method to save only the articles that were successfully processed and selected to the history file. This ensures that only articles that made it through the complete processing pipeline are marked as "processed".
     -   Robust date parsing with fallbacks.
 
 ### 3. Content Extraction (`src/better_morning/content_extractor.py`)
@@ -136,6 +138,7 @@ This is the entry point of the application, orchestrating the entire news digest
     -   Aggregates the summaries from all collections and tracks skipped sources across all collections for comprehensive reporting.
     -   Generates the `final_markdown_digest` using `DocumentGenerator`, including information about any skipped sources.
     -   Based on `global_config.default_output_settings.output_type`, it either calls `document_generator.create_github_release` or `document_generator.send_via_email`. It gracefully handles missing secrets/environment variables for local runs by saving the digest to a local Markdown file if external output is not fully configured.
+    -   **History Management**: Only after the digest has been successfully output (sent/written), the system saves the processed articles to history. This ensures that if any step fails during processing or output, no articles are marked as "processed" and will be available for the next run.
     -   Prints the final digest to the console with summary information about processing results.
 
 ### 7. Local Execution Script (`run_local.py`)
