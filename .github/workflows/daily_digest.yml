@@ -4,6 +4,7 @@ on:
   workflow_dispatch: # Allows manual triggering
   schedule:
     - cron: "30 7 * * *" # Runs daily at 07:30 UTC (8:30 CET)
+    - cron: "30 16 * * *" # Runs daily at 16:30 UTC (17:30 CET)
 
 env:
   PYTHONUNBUFFERED: "1" # Ensure Python output is unbuffered
