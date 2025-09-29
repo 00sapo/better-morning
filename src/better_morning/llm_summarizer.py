@@ -158,19 +158,12 @@ class LLMSummarizer:
             return "No articles to summarize for this collection.", []
 
         # 1. Summarize each individual article concurrently
-        articles_to_summarize = [a for a in articles if not a.summary]
-        already_summarized = [a for a in articles if a.summary]
-
-        tasks = []
-        if articles_to_summarize:
-            print(f"Summarizing {len(articles_to_summarize)} individual articles...")
-            for article in articles_to_summarize:
-                tasks.append(self.summarize_text(article))
-            
-            newly_summarized = await asyncio.gather(*tasks)
-            summarized_articles = already_summarized + newly_summarized
-        else:
-            summarized_articles = already_summarized
+        # 1. Generate LLM summaries for all articles
+        # Note: Articles coming from RSS always have some summary, but we want LLM summaries for the digest
+        print(f"Generating LLM summaries for all {len(articles)} articles...")
+        
+        tasks = [self.summarize_text(article) for article in articles]
+        summarized_articles = await asyncio.gather(*tasks)
 
         effectively_summarized_articles = [
             a for a in summarized_articles if a.summary and not a.summary.startswith("[Error:")
