@@ -8,6 +8,7 @@ from better_morning.config import (
     load_global_config,
     load_collection,
     GlobalConfig,
+    get_secret,
 )
 from better_morning.rss_fetcher import RSSFetcher, Article
 from better_morning.content_extractor import ContentExtractor
@@ -167,7 +168,11 @@ async def main():
                 tag_name, release_name, final_markdown_digest, repo_slug
             )
     elif output_type == "email":
-        recipient_email = global_config.output_settings.recipient_email
+        try:
+            recipient_email = get_secret(global_config.output_settings.recipient_email_env, "Recipient Email")
+        except ValueError:
+            recipient_email = None
+        
         if (
             not recipient_email
             or not global_config.output_settings.smtp_server

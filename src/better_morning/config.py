@@ -29,7 +29,7 @@ class OutputSettings(BaseModel):
     smtp_port: Optional[int] = 587
     smtp_username_env: Optional[str] = None  # Env var name for SMTP username
     smtp_password_env: Optional[str] = None  # Env var name for SMTP password
-    recipient_email: Optional[str] = None
+    recipient_email_env: Optional[str] = None  # Env var name for recipient email
     github_token_env: Optional[str] = "GH_TOKEN"  # Env var name for GitHub token
 
 
