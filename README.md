@@ -14,6 +14,7 @@
 - **Daily Automation**: Runs automatically via a GitHub Action at a user-defined schedule.
 - **Flexible Output**: Publish your daily digest as a GitHub Release or send it directly to your email.
 - **Token Management**: Automatically truncates content if it exceeds a specified token limit to prevent excessive LLM costs.
+- **Google Scholar Alerts**: Automatically retrieve articles from google scholar alerts.
 
 ## 🚀 Getting Started
 

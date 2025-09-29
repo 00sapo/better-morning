@@ -2,6 +2,7 @@ import asyncio
 from typing import Optional, List
 import litellm
 import os
+import base64
 
 from .config import LLMSettings, GlobalConfig, get_secret
 from .rss_fetcher import Article
@@ -62,6 +63,11 @@ class LLMSummarizer:
         if article.content_type == "application/pdf" and article.raw_content:
             # Multimodal message for models that support it (like GPT-4o)
             print(f"Preparing multimodal summary request for PDF: {article.title}")
+
+            # Base64-encode the PDF content
+            base64_pdf = base64.b64encode(article.raw_content).decode("utf-8")
+            base64_url = f"data:application/pdf;base64,{base64_pdf}"
+
             text_prompt = (
                 f"Please summarize the attached PDF document titled '{article.title}' "
                 f"in approximately {self.settings.k_words_each_summary} words. "
@@ -72,7 +78,10 @@ class LLMSummarizer:
                     "role": "user",
                     "content": [
                         {"type": "text", "text": text_prompt},
-                        {"type": "pdf", "pdf": article.raw_content},
+                        {
+                            "type": "file",
+                            "file": {"file_data": base64_url},
+                        },
                     ],
                 }
             ]
@@ -134,7 +143,12 @@ class LLMSummarizer:
             return article
 
     async def _summarize_text_content(
-        self, text_content: str, prompt: str, model_name: str, title: str = "Untitled", timeout=120
+        self,
+        text_content: str,
+        prompt: str,
+        model_name: str,
+        title: str = "Untitled",
+        timeout=120,
     ) -> str:
         """Helper to summarize raw text content using the configured LLM."""
         truncated_prompt, _ = self._truncate_text_to_token_limit(

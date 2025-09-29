@@ -5,7 +5,7 @@ import requests
 import asyncio
 import os
 import re
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse, parse_qs
 from bs4 import BeautifulSoup
 import magic
 
@@ -47,16 +47,61 @@ class ContentExtractor:
         """Fetches content using requests, suitable for static pages."""
         try:
             loop = asyncio.get_running_loop()
+
+            # Direct handling for Google Scholar links
+            parsed_url = urlparse(url)
+            if "scholar.google.com" in parsed_url.netloc:
+                query_params = parse_qs(parsed_url.query)
+                if "url" in query_params:
+                    direct_url = query_params["url"][0]
+                    print(f"  -> Google Scholar link found, fetching direct URL: {direct_url}")
+                    response = await loop.run_in_executor(
+                        None,
+                        lambda: requests.get(
+                            direct_url,
+                            headers={"User-Agent": self.user_agent},
+                            timeout=15,
+                            allow_redirects=True,
+                        ),
+                    )
+                    response.raise_for_status()
+                    return response
+
+            # Standard fetch for all other URLs
             response = await loop.run_in_executor(
                 None,
                 lambda: requests.get(
                     url,
                     headers={"User-Agent": self.user_agent},
                     timeout=15,
-                    allow_redirects=True,  # Explicitly allow redirects
+                    allow_redirects=True,
                 ),
             )
             response.raise_for_status()
+
+            # Handle potential meta refresh redirects (e.g., from Google Scholar)
+            content_type_header = response.headers.get("Content-Type", "").lower()
+            if "text/html" in content_type_header:
+                soup = BeautifulSoup(response.text, "html.parser")
+                meta_tag = soup.find("meta", attrs={"http-equiv": "refresh"})
+                if meta_tag and meta_tag.get("content"):
+                    content = meta_tag["content"]
+                    match = re.search(r"url=['\"]?([^'\" >]+)", content, re.IGNORECASE)
+                    if match:
+                        redirect_url = match.group(1)
+                        print(f"  -> Meta refresh found, fetching final URL: {redirect_url}")
+                        final_response = await loop.run_in_executor(
+                            None,
+                            lambda: requests.get(
+                                redirect_url,
+                                headers={"User-Agent": self.user_agent},
+                                timeout=15,
+                                allow_redirects=True,
+                            ),
+                        )
+                        final_response.raise_for_status()
+                        return final_response
+
             return response
         except requests.RequestException as e:
             print(f"Info: requests fetch failed for {url}: {e}.")
@@ -175,6 +220,7 @@ class ContentExtractor:
                 if sub_response:
                     sub_content_type = sub_response.headers.get("Content-Type", "").lower()
                     sub_final_url = sub_response.url
+                    print(f"  -> Sub-link details: URL={sub_final_url}, Content-Type={sub_content_type}")
 
                     try:
                         sub_detected_mime = magic.from_buffer(sub_response.content, mime=True)
