@@ -32,7 +32,7 @@ max_articles = 10
 
 [llm_settings]
 n_most_important_news = 3
-k_words_each_summary = 150
+k_words_each_summary = 100
 
 [content_extraction_settings]
 collection_prompt = "Crea una panoramica completa ma concisa delle notizie, prospettive, e opinioni presentate in questi articoli. Presta particolare attenzione alle notizie riguardanti i l'informatica, le reti neurali, la musica, i paesaggi sonori e l'urbanistica."
