@@ -1,0 +1,54 @@
+name = "General"
+
+[[feeds]]
+url = "https://cms.ilmanifesto.it/feed"
+name = "Il Manifesto"
+max_articles = 40
+
+[[feeds]]
+url = "https://www.editorialedomani.it/rss"
+name = "Domani"
+max_articles = 40
+
+[[feeds]]
+url = "https://www.ilfattoquotidiano.it/feed/"
+name = "Il Fatto Quotidiano"
+max_articles = 40
+
+[[feeds]]
+url = "https://www.internazionale.it/sitemaps/rss.xml"
+name = "Internazionale"
+max_articles = 10
+
+[[feeds]]
+url = "https://www.aljazeera.com/xml/rss/all.xml"
+name = "Al Jazeera"
+max_articles = 40
+
+[[feeds]]
+url = "https://rss.beehiiv.com/feeds/4aF2pGVAEN.xml"
+name = "Minimalist"
+max_articles = 1
+# follow_article_links = true
+
+[[feeds]]
+url = "https://www.scmp.com/rss/91/feed/"
+name = "South China Morning Post"
+max_articles = 40
+
+[[feeds]]
+url = "https://kill-the-newsletter.com/feeds/ux2oalf2fgp30jige2es.xml"
+name = "Reuters Daily"
+max_articles = 1
+# follow_article_links = true
+
+[[feeds]]
+url = "https://it.euronews.com/rss
+name = "EuroNews"
+max_articles = 40
+
+[llm_settings]
+n_most_important_news = 10
+k_words_each_summary = 150
+
+collection_prompt = "Fornisci una panoramica completa ma concisa delle notizie politiche, opinioni politiche, commenti e prospettive presentate in questi articoli. Crea due sezioni: una riguardante le notizie più importanti sulla politica italiana e una sezione sulla politica estera. Tralascia ogni altro argomento che non sia politica."
