@@ -7,6 +7,7 @@ import os
 import re
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
+import magic
 
 from .rss_fetcher import Article
 from .config import ContentExtractionSettings
@@ -52,6 +53,7 @@ class ContentExtractor:
                     url,
                     headers={"User-Agent": self.user_agent},
                     timeout=15,
+                    allow_redirects=True,  # Explicitly allow redirects
                 ),
             )
             response.raise_for_status()
@@ -75,9 +77,27 @@ class ContentExtractor:
         response = await self._fetch_with_requests(str(article.link))
 
         if response:
-            content_type = response.headers.get("Content-Type", "")
-            if "application/pdf" in content_type:
-                print(f"PDF content detected for '{article.title}'.")
+            content_type_header = response.headers.get("Content-Type", "").lower()
+            final_url = response.url
+            
+            # Use python-magic to detect actual content type from the content
+            try:
+                detected_mime = magic.from_buffer(response.content, mime=True)
+                print(f"Content analysis for '{article.title}': Header={content_type_header}, Detected={detected_mime}, URL={final_url}")
+            except Exception as e:
+                print(f"Warning: python-magic detection failed for '{article.title}': {e}")
+                detected_mime = ""
+            
+            # Check for PDF using multiple methods: magic detection, header, and URL
+            is_pdf = (
+                detected_mime == "application/pdf" or
+                "application/pdf" in content_type_header or
+                "pdf" in content_type_header or
+                str(final_url).lower().endswith('.pdf')
+            )
+            
+            if is_pdf:
+                print(f"PDF content confirmed for '{article.title}'.")
                 article.raw_content = response.content
                 article.content_type = "application/pdf"
                 # No HTML content to process, so we can return early.
