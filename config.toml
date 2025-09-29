@@ -16,10 +16,10 @@ follow_article_links = false
 parser_type = "html.parser"
 
 [output_settings]
-output_type = "github_release"                     # Options: "github_release", "email"
+output_type = "email"                              # Options: "github_release", "email"
 github_repo_slug_env = "GITHUB_REPOSITORY"
 github_token_env = "BETTER_MORNING_GITHUB_TOKEN"
-recipient_email = "federicosimonetta@zoho.com"     # Required if output_type is "email"
+recipient_email_env = "BETTER_MORNING_RECIPIENT_EMAIL"  # Required if output_type is "email"
 smtp_server = "smtp.zoho.com"                      # Required if output_type is "email"
 smtp_port = 465                                    # Required if output_type is "email"
 smtp_username_env = "BETTER_MORNING_SMTP_USERNAME" # Required if output_type is "email"
@@ -30,3 +30,4 @@ llm_api_key = "BETTER_MORNING_LLM_API_KEY"
 github_token = "BETTER_MORNING_GITHUB_TOKEN"
 smtp_username = "BETTER_MORNING_SMTP_USERNAME"
 smtp_password = "BETTER_MORNING_SMTP_PASSWORD"
+recipient_email = "BETTER_MORNING_RECIPIENT_EMAIL"

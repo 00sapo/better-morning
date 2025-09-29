@@ -108,7 +108,7 @@ This module is responsible for formatting the summarized news into a document an
 -   **`DocumentGenerator`**: A class that:
     -   Initializes with `OutputSettings` and `GlobalConfig`.
     -   **`generate_markdown_digest(collection_summaries: Dict[str, str], date: datetime) -> str`**: Takes a dictionary of collection names to their summary strings and a date. It formats these into a single Markdown string, including a main title and sub-sections for each collection summary.
-    -   **`send_via_email(subject: str, body: str, recipient_email: str)`**: Sends the generated digest via email using `smtplib` and `MIMEMultipart`. It retrieves SMTP credentials using `get_secret` and requires `smtp_server`, `smtp_port`, `smtp_username_env`, `smtp_password_env`, and `recipient_email` to be configured.
+    -   **`send_via_email(subject: str, body: str, recipient_email: str)`**: Sends the generated digest via email using `smtplib` and `MIMEMultipart`. It retrieves SMTP credentials using `get_secret` and requires `smtp_server`, `smtp_port`, `smtp_username_env`, `smtp_password_env`, and `recipient_email_env` to be configured.
     -   **`create_github_release(tag_name: str, release_name: str, body: str, repo_slug: str)`**: Creates a new GitHub Release using the GitHub API. It retrieves the GitHub token via `get_secret` (using `github_token_env`), constructs the API request, and posts the digest as the release body. Requires `repo_slug` (e.g., `owner/repo`) to be available.
 
 ### 6. Main Application Flow (`src/main.py`)
@@ -145,7 +145,7 @@ Automates the daily execution of the `main.py` script.
 
 -   **`on: workflow_dispatch`**: Allows manual triggering of the workflow from the GitHub UI.
 -   **`on: schedule: - cron: '0 0 * * *'`**: Configures the workflow to run daily at 00:00 UTC.
--   **`env`**: Sets `PYTHONUNBUFFERED` and maps GitHub Secrets (like `BETTER_MORNING_LLM_API_KEY`, `BETTER_MORNING_SMTP_USERNAME`, `BETTER_MORNING_SMTP_PASSWORD`) to environment variables that `main.py` and its modules expect.
+-   **`env`**: Sets `PYTHONUNBUFFERED` and maps GitHub Secrets (like `BETTER_MORNING_LLM_API_KEY`, `BETTER_MORNING_SMTP_USERNAME`, `BETTER_MORNING_SMTP_PASSWORD`, `BETTER_MORNING_RECIPIENT_EMAIL`, `BETTER_MORNING_GITHUB_TOKEN`) to environment variables that `main.py` and its modules expect.
 -   **`jobs.build.steps`**: Defines the sequence of actions:
     1.  `Checkout repository`: Retrieves the code.
     2.  `Set up Python`: Configures Python 3.13 environment.
