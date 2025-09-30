@@ -179,8 +179,15 @@ class ContentExtractor:
         main_text_content = self._extract_from_html(html_content)
         all_text_contents = [main_text_content] if main_text_content else []
 
+        # Determine whether to follow links: use article's setting first, then collection's setting
+        should_follow_links = (
+            article.follow_article_links 
+            if article.follow_article_links is not None 
+            else self.settings.follow_article_links
+        )
+        
         # If follow_article_links is True, find and fetch content from internal links
-        if self.settings.follow_article_links:
+        if should_follow_links:
             print(f"Following links for '{article.title}'...")
             soup = BeautifulSoup(html_content, "html.parser")
             links_to_follow = []

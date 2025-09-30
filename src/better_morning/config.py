@@ -52,6 +52,7 @@ class RSSFeed(BaseModel):
     url: HttpUrl
     name: Optional[str] = None  # Name is optional now
     max_articles: Optional[int] = None  # Max articles to fetch from this feed
+    follow_article_links: Optional[bool] = None  # Per-source link following setting
 
 
 # --- Collection-specific overrides (for parsing TOML) ---

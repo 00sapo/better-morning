@@ -19,6 +19,7 @@ class Article(BaseModel):
     content: Optional[str] = None  # For text-based content
     raw_content: Optional[bytes] = None  # For binary content like PDFs
     content_type: Optional[str] = None  # E.g., 'application/pdf'
+    follow_article_links: Optional[bool] = None  # Per-article link following setting from source
 
 
 # Custom JSON encoder for datetime objects
@@ -174,6 +175,7 @@ class RSSFetcher:
                         source_url=feed_config.url,
                         published_date=published_date,
                         summary=summary_text,
+                        follow_article_links=feed_config.follow_article_links,
                     )
                     new_articles.append(article)
                     all_fetched_articles_for_history.append(
