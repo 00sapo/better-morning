@@ -30,6 +30,11 @@ url = "https://www.lacittafutura.it/?format=feed&type=rss"
 name = "La Città Futura"
 max_articles = 2
 
+[[feeds]]
+url = "https://jacobinitalia.it/feed/"
+name = "Jacobin Italia"
+max_articles = 2
+
 [llm_settings]
 n_most_important_news = 2
 k_words_each_summary = 150

@@ -47,6 +47,16 @@ url = "https://it.euronews.com/rss"
 name = "EuroNews"
 max_articles = 40
 
+[[feeds]]
+url = "https://www.wsws.org/en/rss.xml"
+name = "WSWS"
+max_articles = 40
+
+[[feeds]]
+url = "https://znetwork.org/category/featured/feed/?post_type=znetarticle"
+name = "ZNet"
+max_articles = 40
+
 [llm_settings]
 n_most_important_news = 7
 k_words_each_summary = 100
