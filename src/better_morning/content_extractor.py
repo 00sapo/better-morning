@@ -5,9 +5,12 @@ import requests
 import asyncio
 import os
 import re
+import time
+import random
 from urllib.parse import urljoin, urlparse, parse_qs
 from bs4 import BeautifulSoup
 import magic
+from pydantic import HttpUrl
 
 from .rss_fetcher import Article
 from .config import ContentExtractionSettings
@@ -18,10 +21,20 @@ class ContentExtractor:
         self.settings = settings
         self.browser: Optional[Browser] = None
         self._playwright = None
-        self.user_agent = (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        )
+        self.user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0",
+        ]
+        # Track domains for rate limiting
+        self._domain_last_access = {}
+        # Track active pages for resource management
+        self._active_pages = 0
+        self._max_concurrent_pages = 5
+
+    @property
+    def user_agent(self):
+        return random.choice(self.user_agents)
 
     async def start_browser(self):
         """Starts the Playwright browser instance."""
@@ -35,6 +48,33 @@ class ContentExtractor:
             await self.browser.close()
         if self._playwright:
             await self._playwright.stop()
+
+    def _get_domain(self, url: str) -> str:
+        """Extract domain from URL for rate limiting purposes."""
+        try:
+            return urlparse(str(url)).netloc.lower()
+        except Exception:
+            return "unknown"
+
+    async def _apply_rate_limit(self, domain: str, min_delay: float = 0.5, max_delay: float = 2.0):
+        """Apply rate limiting per domain with randomized delays."""
+        current_time = time.time()
+        last_access = self._domain_last_access.get(domain, 0)
+        
+        # Calculate time since last access to this domain
+        time_since_last = current_time - last_access
+        
+        # Add random delay between min_delay and max_delay seconds
+        delay = random.uniform(min_delay, max_delay)
+        
+        # If we accessed this domain recently, wait additional time
+        if time_since_last < delay:
+            additional_wait = delay - time_since_last
+            print(f"Rate limiting {domain}: waiting {additional_wait:.1f}s")
+            await asyncio.sleep(additional_wait)
+        
+        # Update last access time
+        self._domain_last_access[domain] = time.time()
 
     def _extract_from_html(self, html_content: str) -> Optional[str]:
         """Extracts main textual content from HTML using the trafilatura library."""
@@ -112,6 +152,16 @@ class ContentExtractor:
             return None
 
     async def get_content(self, article: Article) -> List[Article]:
+        try:
+            return await asyncio.wait_for(self._get_content_impl(article), timeout=120.0)
+        except asyncio.TimeoutError:
+            print(f"Timeout processing article '{article.title}', falling back to RSS summary")
+            article.content = article.summary or "Content unavailable due to timeout"
+            article.content_type = "text/plain"
+            return [article]
+    
+    async def _get_content_impl(self, article: Article) -> List[Article]:
+        overall_start_time = time.time()
         # If RSS summary is long enough (≥400 words), use it without fetching the article
         if article.summary and len(article.summary.split()) >= 400:
             print(
@@ -126,9 +176,17 @@ class ContentExtractor:
             f"Info: RSS summary for '{article.title}' has only {len(article.summary.split()) if article.summary else 0} words (<400). Fetching article content..."
         )
 
-        # First, try fetching with requests
-        response = await self._fetch_with_requests(str(article.link))
+        # Apply rate limiting before fetching
+        domain = self._get_domain(str(article.link))
+        await self._apply_rate_limit(domain)
 
+        # First, try fetching with requests
+        requests_start_time = time.time()
+        response = await self._fetch_with_requests(str(article.link))
+        requests_duration = time.time() - requests_start_time
+        print(f"TIMER: requests fetch for '{article.title}' took {requests_duration:.2f}s")
+
+        html_content = None
         if response:
             content_type_header = response.headers.get("Content-Type", "").lower()
             final_url = response.url
@@ -161,25 +219,44 @@ class ContentExtractor:
                 return [article]
             else:
                 html_content = response.text
-        else:
-            html_content = None
-
+        
         # If requests fails or content is not PDF, fall back to Playwright for HTML
         if html_content is None:
+            playwright_start_time = time.time()
             print("Falling back to Playwright.")
             if not self.browser:
                 raise RuntimeError("Browser not started. Call start_browser() first.")
+            page = None
             try:
+                # Limit concurrent browser pages
+                if self._active_pages >= self._max_concurrent_pages:
+                    print(f"Too many active pages ({self._active_pages}), waiting...")
+                    await asyncio.sleep(1.0)
+                
+                self._active_pages += 1
                 page = await self.browser.new_page(user_agent=self.user_agent)
                 print(
                     f"Fetching content with Playwright for: {article.title} from {article.link}"
                 )
-                await page.goto(str(article.link), timeout=30000)
-                html_content = await page.content()
-                await page.close()
+                # Add timeout wrapper for the entire page operation
+                await asyncio.wait_for(page.goto(str(article.link), timeout=30000), timeout=45.0)
+                html_content = await asyncio.wait_for(page.content(), timeout=10.0)
+            except asyncio.TimeoutError:
+                print(f"Timeout fetching article with Playwright {article.link}")
+                html_content = None
             except Exception as e:
                 print(f"Error fetching article with Playwright {article.link}: {e}")
-                html_content = None  # Ensure html_content is None on failure
+                html_content = None
+            finally:
+                if page:
+                    try:
+                        await page.close()
+                        self._active_pages = max(0, self._active_pages - 1)
+                    except Exception as e:
+                        print(f"Warning: Failed to close page: {e}")
+                        self._active_pages = max(0, self._active_pages - 1)
+            playwright_duration = time.time() - playwright_start_time
+            print(f"TIMER: Playwright fetch for '{article.title}' took {playwright_duration:.2f}s")
 
         if not html_content:
             article.content = (
@@ -188,8 +265,11 @@ class ContentExtractor:
             return [article]
 
         # Extract text from the main article
+        trafilatura_start_time = time.time()
         main_text_content = self._extract_from_html(html_content)
-
+        trafilatura_duration = time.time() - trafilatura_start_time
+        print(f"TIMER: Trafilatura extraction for '{article.title}' took {trafilatura_duration:.2f}s")
+        
         # Set the main article content
         article.content = main_text_content or article.summary
         article.content_type = "text/plain"
@@ -203,6 +283,8 @@ class ContentExtractor:
 
         # If follow_article_links is False, return just the main article
         if not should_follow_links:
+            overall_duration = time.time() - overall_start_time
+            print(f"TIMER: Total processing for '{article.title}' (no links) took {overall_duration:.2f}s")
             return [article]
 
         # If follow_article_links is True, create separate articles for each followed link
@@ -244,6 +326,10 @@ class ContentExtractor:
 
         for i, link in enumerate(unique_links):
             print(f"  -> Fetching sub-link: {link}")
+            # Apply rate limiting for sub-links too
+            sub_domain = self._get_domain(link)
+            await self._apply_rate_limit(sub_domain)
+            
             sub_response = await self._fetch_with_requests(link)
             if sub_response:
                 sub_content_type = sub_response.headers.get("Content-Type", "").lower()
@@ -298,5 +384,7 @@ class ContentExtractor:
                         continue
 
                 all_articles.append(linked_article)
-
+        
+        overall_duration = time.time() - overall_start_time
+        print(f"TIMER: Total processing for '{article.title}' (with links) took {overall_duration:.2f}s")
         return all_articles

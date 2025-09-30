@@ -3,26 +3,31 @@ name = "Locale"
 [[feeds]]
 url = "https://laprovinciapavese.gelocal.it/rss/finegil/laprovinciapavese/feed.rss"
 name = "La Provincia Pavese"
-max_articles = 30
+max_articles = 40
 
 [[feeds]]
 url = "https://www.ilgiorno.it/pavia/rss"
 name = "Il Giorno Pavia"
-max_articles = 30
-
-[[feeds]]
-url = "http://www.repubblica.it/rss/homepage/rss2.0.xml"
-name = "Repubblica Milano"
-max_articles = 30
+max_articles = 40
 
 [[feeds]]
 url = "https://www.fanpage.it/milano/feed/"
 name = "Fanpage Milano"
-max_articles = 30
+max_articles = 20
+
+[[feeds]]
+url = "https://primapavia.it/feed/"
+name = "Prima Pavia"
+max_articles = 20
+
+[[feeds]]
+url = "https://www.ilgiorno.it/milano/rss"
+name = "Il Giorno Milano"
+max_articles = 20
 
 [llm_settings]
-n_most_important_news = 5
+n_most_important_news = 3
 k_words_each_summary = 100
 
 [content_extraction_settings]
-collection_prompt = "Fornisci una panoramica completa ma concisa delle notizie di natura politica. Elimina tutto ciò che riguarda la cronaca nera, gli eventi locali, le notizie sportive e culturali, a meno che non abbiano un impatto significativo sulla politica di Pavia e/o della Lombardia. Non includere notizie di livello nazionale o internazionale."
+collection_prompt = "Fornisci una panoramica completa ma concisa delle notizie di natura *politica*. *Elimina* tutto ciò che riguarda la cronaca nera, gli eventi locali, le notizie sportive e culturali, a meno che non abbiano un impatto significativo sulla politica di Pavia e/o della Lombardia. *Non includere* notizie di livello nazionale o internazionale."
