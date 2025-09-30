@@ -48,7 +48,7 @@ name = "EuroNews"
 max_articles = 40
 
 [llm_settings]
-n_most_important_news = 10
-k_words_each_summary = 150
+n_most_important_news = 7
+k_words_each_summary = 100
 
 collection_prompt = "Fornisci una panoramica completa ma concisa delle notizie politiche, opinioni politiche, commenti e prospettive presentate in questi articoli. Crea due sezioni: una riguardante le notizie più importanti sulla politica italiana e una sezione sulla politica estera. Tralascia ogni altro argomento che non sia politica."
