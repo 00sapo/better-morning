@@ -268,20 +268,8 @@ async def main():
         if collection_name in articles_by_collection and articles_by_collection[collection_name]:
             rss_fetcher = RSSFetcher(feeds=collection_config.feeds)
             
-            # Get all articles that were fetched for this collection, not just summarized ones
-            all_processed_articles = []
-            for name, _, articles, _, _ in collection_results:
-                if name == collection_name:
-                    all_processed_articles.extend(articles)
-
-            # We save all articles that were selected for fetching, not just the ones that were successfully summarized.
+            # We save the articles that were successfully summarized to history.
             # This prevents them from being re-processed in the next run.
-            articles_to_save = [
-                article 
-                for article in all_processed_articles 
-                if article in articles_by_collection[collection_name]
-            ]
-
             rss_fetcher.save_selected_articles_to_history(
                 collection_name, articles_by_collection[collection_name]
             )

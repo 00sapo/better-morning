@@ -11,7 +11,7 @@ The goal of this project is to create a system that generates a daily news diges
 - **Smart Article Selection**: The `max_articles` setting per feed selects from only new articles (excluding previously processed ones), ensuring no duplicate processing.
 - **Content Extraction**: The system can extract content from the article's link, handling both HTML pages and PDF documents.
 - **Summarization**: Summaries are generated using an LLM of the user's choice, supported by `litellm`.
-- **Robust History Management**: Articles are only marked as "processed" in history after successful completion of the entire pipeline, preventing data loss on failures.
+- **Robust History Management**: Articles are only marked as "processed" in history after successful completion of the entire pipeline (including summarization), preventing data loss on failures.
 - **Automation**: The process is automated using a GitHub Action.
 - **Output**: The final digest can be published as a GitHub release or sent via email.
 
