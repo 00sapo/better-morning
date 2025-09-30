@@ -32,7 +32,7 @@ class DocumentGenerator:
 
         # Build the General Overview from individual collection summaries
         overview_parts = ["## General Overview"]
-        for collection_name, summary in collection_summaries.items():
+        for collection_name, summary in sorted(collection_summaries.items()):
             overview_parts.append(f"\n### {collection_name}\n")
             overview_parts.append(summary)
         overview_section = "\n".join(overview_parts)
@@ -74,7 +74,7 @@ class DocumentGenerator:
                 skipped_sources_section += f"- {source}\n"
 
         detailed_sections = ["## Detailed Summaries"]
-        for collection_name, articles in articles_by_collection.items():
+        for collection_name, articles in sorted(articles_by_collection.items()):
             # Filter out articles that might have failed summarization
             valid_articles = [
                 a for a in articles if a.summary and not a.summary.startswith("[Error:")

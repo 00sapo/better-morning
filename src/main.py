@@ -135,7 +135,7 @@ async def main():
     print("Global configuration loaded successfully.")
 
     # 2. Find and process all collections concurrently
-    collection_files = glob.glob("collections/*.toml")
+    collection_files = sorted(glob.glob("collections/*.toml"))
     if not collection_files:
         print("No collection TOML files found. Exiting.")
         return
