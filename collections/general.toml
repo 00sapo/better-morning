@@ -29,7 +29,7 @@ max_articles = 40
 url = "https://rss.beehiiv.com/feeds/4aF2pGVAEN.xml"
 name = "Minimalist"
 max_articles = 1
-# follow_article_links = true
+follow_article_links = true
 
 [[feeds]]
 url = "https://www.scmp.com/rss/91/feed/"
@@ -40,10 +40,10 @@ max_articles = 40
 url = "https://kill-the-newsletter.com/feeds/ux2oalf2fgp30jige2es.xml"
 name = "Reuters Daily"
 max_articles = 1
-# follow_article_links = true
+follow_article_links = true
 
 [[feeds]]
-url = "https://it.euronews.com/rss
+url = "https://it.euronews.com/rss"
 name = "EuroNews"
 max_articles = 40
 

@@ -50,7 +50,12 @@ async def process_collection(
         content_extraction_tasks = [
             content_extractor.get_content(article) for article in new_articles
         ]
-        processed_articles = await asyncio.gather(*content_extraction_tasks)
+        content_extraction_results = await asyncio.gather(*content_extraction_tasks)
+        
+        # Flatten the results since get_content now returns List[Article]
+        processed_articles = []
+        for article_list in content_extraction_results:
+            processed_articles.extend(article_list)
 
         # Track and filter sources with high failure rates
         source_stats = {}
