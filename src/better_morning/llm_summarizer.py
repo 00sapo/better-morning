@@ -49,7 +49,9 @@ class LLMSummarizer:
         for i, article in enumerate(articles):
             # Use RSS summary if available, otherwise just title
             summary_text = f" - {article.summary}" if article.summary else ""
-            article_lines.append(f"{i + 1}. {article.title}{summary_text}")
+            article_lines.append(
+                f"{i + 1}. {article.title} ({article.published_date}) - {summary_text[:40]}"
+            )
         articles_str = "\n".join(article_lines)
 
         prompt = f"""
@@ -282,7 +284,7 @@ Articles:
 
         collection_summary_prompt = (
             f"From the following list of article summaries, please identify the {self.settings.n_most_important_news} "
-            f"most important news stories. Considering that the same story may be in the multitiple articles from different perspectives and with different details, write a cohesive and concise summary of those top stories. "
+            f"most important stories. Considering that the same story may be repeated in multitiple articles from different perspectives and with different details, write a cohesive and concise summary of those top stories. "
             f"The final summary must be in {self.settings.output_language}. "
             f"**Crucially, for every piece of information you include, you MUST cite the source using a Markdown link like this: ([feed name](Link)).** "
             f"The final summary MUST be of {self.settings.k_words_each_summary * min(self.settings.n_most_important_news, len(effectively_summarized_articles))} words. "
