@@ -11,12 +11,12 @@ name = "Il Giorno Pavia"
 max_articles = 40
 
 [[feeds]]
-url = "https://www.fanpage.it/milano/feed/"
+url = "https://www.fanpage.it/milano/feed"
 name = "Fanpage Milano"
 max_articles = 20
 
 [[feeds]]
-url = "https://primapavia.it/feed/"
+url = "https://primapavia.it/feed"
 name = "Prima Pavia"
 max_articles = 20
 
