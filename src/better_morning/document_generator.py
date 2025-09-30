@@ -25,6 +25,7 @@ class DocumentGenerator:
         articles_by_collection: Dict[str, List[Article]],
         skipped_sources: List[str],
         date: datetime,
+        fetch_reports: Dict[str, dict] = None,
     ) -> str:
         """Formats the digest with a top-level overview and detailed summaries."""
         title = f"# Daily Digest - {date.strftime('%Y-%m-%d')}"
@@ -36,9 +37,39 @@ class DocumentGenerator:
             overview_parts.append(summary)
         overview_section = "\n".join(overview_parts)
 
+        # Generate feed report section
+        feed_report_section = ""
+        if fetch_reports:
+            all_successful = []
+            all_failed = []
+            total_articles = 0
+            total_feeds = 0
+            
+            for collection_name, report in fetch_reports.items():
+                all_successful.extend([(s, collection_name) for s in report['successful']])
+                all_failed.extend([(f, collection_name) for f in report['failed']])
+                total_articles += sum(s['articles_fetched'] for s in report['successful'])
+                total_feeds += report['total_feeds']
+            
+            success_rate = len(all_successful) / total_feeds if total_feeds > 0 else 0
+            
+            feed_report_section = f"\n## Feed Processing Report\n\n"
+            feed_report_section += f"**Summary**: {len(all_successful)}/{total_feeds} feeds successful ({success_rate:.1%}) • {total_articles} articles fetched\n\n"
+            
+            if all_successful:
+                feed_report_section += "### ✅ Successful Feeds\n\n"
+                for (feed, collection) in all_successful:
+                    feed_report_section += f"- **{feed['name']}** ({collection}): {feed['articles_fetched']} articles\n  `{feed['url']}`\n\n"
+            
+            if all_failed:
+                feed_report_section += "### ❌ Failed Feeds\n\n"
+                feed_report_section += "*Consider removing these feeds from your collections:*\n\n"
+                for (feed, collection) in all_failed:
+                    feed_report_section += f"- **{feed['name']}** ({collection}): {feed['error']}\n  `{feed['url']}`\n\n"
+
         skipped_sources_section = ""
         if skipped_sources:
-            skipped_sources_section = "\n## Skipped Sources\n\nThe following sources were skipped due to a high number of consecutive errors:\n\n"
+            skipped_sources_section = "\n## Skipped Sources\n\nThe following sources were skipped due to a high number of consecutive content extraction errors:\n\n"
             for source in skipped_sources:
                 skipped_sources_section += f"- {source}\n"
 
@@ -58,6 +89,8 @@ class DocumentGenerator:
 
         # Assemble the final document
         final_document_parts = [title, overview_section]
+        if feed_report_section:
+            final_document_parts.extend(["---", feed_report_section])
         if skipped_sources_section:
             final_document_parts.extend(["---", skipped_sources_section])
         final_document_parts.extend(["---"] + detailed_sections)

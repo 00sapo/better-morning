@@ -3,6 +3,7 @@ from typing import Optional, List
 import litellm
 import os
 import base64
+import json
 
 from .config import LLMSettings, GlobalConfig, get_secret
 from .rss_fetcher import Article
@@ -26,6 +27,77 @@ class LLMSummarizer:
                 # This allows for local runs where secrets might not be set up for other purposes.
                 print(f"Warning: {e}")
                 self.settings.api_key = None
+
+    async def select_articles_for_fetching(
+        self, articles: List[Article]
+    ) -> List[Article]:
+        """
+        Uses the reasoner LLM to select the most relevant articles for content fetching
+        based on their titles and RSS summaries.
+        """
+        if not articles:
+            return []
+
+        # Determine the number of articles to select: 3x the number for the final summary,
+        # but not more than the total number of available articles.
+        num_to_select = min(len(articles), 3 * self.settings.n_most_important_news)
+        if num_to_select == 0:
+            return []
+
+        # Prepare a numbered list of articles for the LLM prompt
+        article_lines = []
+        for i, article in enumerate(articles):
+            # Use RSS summary if available, otherwise just title
+            summary_text = f" - {article.summary}" if article.summary else ""
+            article_lines.append(f"{i + 1}. {article.title}{summary_text}")
+        articles_str = "\n".join(article_lines)
+
+        prompt = f"""
+From the following list of articles, select the top {num_to_select} most relevant and important ones to fetch and summarize.
+Provide your answer as a JSON object with a single key "selected_indices" containing a list of the chosen article numbers (e.g., [1, 5, 10]).
+
+Articles:
+{articles_str}
+"""
+
+        try:
+            print(
+                f"Asking LLM to select the best {num_to_select} articles from a list of {len(articles)}..."
+            )
+            response = await litellm.acompletion(
+                model=self.settings.reasoner_model,
+                messages=[{"content": prompt, "role": "user"}],
+                temperature=self.settings.temperature,
+                response_format={"type": "json_object"},
+                api_key=self.settings.api_key,
+                timeout=180,
+            )
+            choice = response.choices[0].message.content
+            selected_data = json.loads(choice)
+            selected_indices = selected_data.get("selected_indices", [])
+
+            if not isinstance(selected_indices, list) or not all(
+                isinstance(i, int) for i in selected_indices
+            ):
+                raise ValueError("Invalid format for selected_indices")
+
+            # Convert 1-based indices from LLM to 0-based list indices
+            selected_articles = [
+                articles[i - 1] for i in selected_indices if 0 < i <= len(articles)
+            ]
+            print(f"LLM selected {len(selected_articles)} articles for fetching.")
+            return selected_articles
+
+        except Exception as e:
+            print(f"Error during LLM article selection: {e}")
+            # Fallback: return the most recent 'n' articles if LLM selection fails
+            print(
+                f"Falling back to selecting the {num_to_select} most recent articles."
+            )
+            sorted_articles = sorted(
+                articles, key=lambda a: a.published_date, reverse=True
+            )
+            return sorted_articles[:num_to_select]
 
     def _get_masked_api_key(self) -> str:
         """Returns a masked version of the API key for debugging."""
@@ -130,16 +202,14 @@ class LLMSummarizer:
                 timeout=120,  # Add a 2-minute timeout
             )
             summary_text = response.choices[0].message.content
-            article.summary = f"{summary_text.strip()}\n\n[Source]({article.link})"
+            article.summary = f"{summary_text.strip()}\n\n[{article.feed_name or 'Source'}]({article.link})"
             return article
         except Exception as e:
             print(f"Error summarizing article '{article.title}' with LLM: {e}")
             if " multimodal " in str(e).lower():
-                article.summary = f"[Error: Could not summarize the provided document.]\n\n[Source]({article.link})"
+                article.summary = f"[Error: Could not summarize the provided document.]\n\n[{article.feed_name or 'Source'}]({article.link})"
             else:
-                article.summary = (
-                    f"[Error: Could not summarize article.]\n\n[Source]({article.link})"
-                )
+                article.summary = f"[Error: Could not summarize article.]\n\n[{article.feed_name or 'Source'}]({article.link})"
             return article
 
     async def _summarize_text_content(
@@ -212,9 +282,9 @@ class LLMSummarizer:
 
         collection_summary_prompt = (
             f"From the following list of article summaries, please identify the {self.settings.n_most_important_news} "
-            f"most important news stories. Then, write a cohesive and concise summary of those top stories. "
+            f"most important news stories. Considering that the same story may be in the multitiple articles from different perspectives and with different details, write a cohesive and concise summary of those top stories. "
             f"The final summary must be in {self.settings.output_language}. "
-            f"**Crucially, for every piece of information you include, you MUST cite the source using a Markdown link like this: ([Source](Link)).** "
+            f"**Crucially, for every piece of information you include, you MUST cite the source using a Markdown link like this: ([feed name](Link)).** "
             f"The final summary MUST be of {self.settings.k_words_each_summary * min(self.settings.n_most_important_news, len(effectively_summarized_articles))} words. "
             f"{user_guideline}\n\n"
             f"Answer with only the final summary, without introductions nor conclusions. Here are the summaries:\n{concatenated_summaries}"

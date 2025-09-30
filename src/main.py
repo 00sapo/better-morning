@@ -18,10 +18,10 @@ from better_morning.document_generator import DocumentGenerator
 
 async def process_collection(
     collection_path: str, global_config: GlobalConfig
-) -> tuple[str, str, List[Article], List[str]]:
+) -> tuple[str, str, List[Article], List[str], dict]:
     """
     Processes a single news collection: fetches, extracts, summarizes.
-    Returns the collection name, its summary, the list of summarized articles, and a list of skipped sources.
+    Returns the collection name, its summary, the list of summarized articles, skipped sources, and fetch report.
     """
     print(f"\n--- Processing collection: {collection_path} ---")
     collection_config = load_collection(collection_path, global_config)
@@ -44,18 +44,33 @@ async def process_collection(
         new_articles = rss_fetcher.fetch_articles(collection_config.name)
         print(f"Found {len(new_articles)} new articles for {collection_config.name}.")
         if not new_articles:
-            return collection_config.name, "No new articles found.", [], []
+            fetch_report = rss_fetcher.get_fetch_report()
+            return collection_config.name, "No new articles found.", [], [], fetch_report
 
-        # 2. Extract content
-        content_extraction_tasks = [
-            content_extractor.get_content(article) for article in new_articles
-        ]
-        content_extraction_results = await asyncio.gather(*content_extraction_tasks)
-        
-        # Flatten the results since get_content now returns List[Article]
+        # 2. Use LLM to select which articles to fetch content for
+        articles_to_fetch = await llm_summarizer.select_articles_for_fetching(new_articles)
+        if not articles_to_fetch:
+            print(f"LLM did not select any articles to fetch for '{collection_config.name}'.")
+            fetch_report = rss_fetcher.get_fetch_report()
+            return collection_config.name, "No articles selected for fetching.", [], [], fetch_report
+
+        # 3. Extract content for the selected articles with batching
+        batch_size = global_config.content_extraction_batch_size
         processed_articles = []
-        for article_list in content_extraction_results:
-            processed_articles.extend(article_list)
+        
+        print(f"Extracting content for {len(articles_to_fetch)} selected articles in batches of {batch_size}...")
+        for i in range(0, len(articles_to_fetch), batch_size):
+            batch = articles_to_fetch[i:i + batch_size]
+            print(f"Processing articles {i + 1}-{min(i + batch_size, len(articles_to_fetch))} of {len(articles_to_fetch)}")
+            
+            content_extraction_tasks = [
+                content_extractor.get_content(article) for article in batch
+            ]
+            batch_results = await asyncio.gather(*content_extraction_tasks)
+            
+            # Flatten the results
+            for article_list in batch_results:
+                processed_articles.extend(article_list)
 
         # Track and filter sources with high failure rates
         source_stats = {}
@@ -89,9 +104,10 @@ async def process_collection(
         ]
 
         if not articles_with_content:
-            return collection_config.name, "No articles with extractable content.", [], list(skipped_sources)
+            fetch_report = rss_fetcher.get_fetch_report()
+            return collection_config.name, "No articles with extractable content.", [], list(skipped_sources), fetch_report
 
-        # 3. Summarize the collection and individual articles
+        # 4. Summarize the collection and individual articles
         print(
             f"Summarizing {len(articles_with_content)} articles for {collection_config.name}..."
         )
@@ -103,7 +119,10 @@ async def process_collection(
             collection_prompt=collection_config.collection_prompt,
         )
 
-        return collection_config.name, collection_summary, summarized_articles, list(skipped_sources)
+        # Get fetch report
+        fetch_report = rss_fetcher.get_fetch_report()
+        
+        return collection_config.name, collection_summary, summarized_articles, list(skipped_sources), fetch_report
     finally:
         await content_extractor.close_browser()
 
@@ -122,31 +141,41 @@ async def main():
         return
 
     print(f"Found {len(collection_files)} collections to process.")
-    tasks = [
-        process_collection(filepath, global_config) for filepath in collection_files
-    ]
-    collection_results: List[tuple[str, str, List[Article], List[str]]] = await asyncio.gather(
-        *tasks
-    )
+
+    collection_results = []
+    # Process collections sequentially to avoid overwhelming the LLM API
+    for filepath in collection_files:
+        try:
+            result = await process_collection(filepath, global_config)
+            collection_results.append(result)
+        except Exception as e:
+            print(f"FATAL: An unexpected error occurred while processing {filepath}: {e}")
+            # Create a dummy result so the aggregation logic doesn't fail
+            collection_name = os.path.basename(filepath).replace(".toml", "")
+            collection_results.append((collection_name, f"[ERROR: Processing failed: {e}]", [], [f"Collection {collection_name} failed"], {}))
+
+    collection_results: List[tuple[str, str, List[Article], List[str], dict]] = collection_results
 
     # 3. Aggregate results
     collection_summaries: Dict[str, str] = {
-        name: summary for name, summary, _, _ in collection_results
+        name: summary for name, summary, _, _, _ in collection_results
     }
     articles_by_collection: Dict[str, List[Article]] = {
-        name: articles for name, _, articles, _ in collection_results
+        name: articles for name, _, articles, _, _ in collection_results
     }
     
     # Collect all unique skipped sources from all processing runs
     skipped_sources = set()
-    for _, _, _, sources in collection_results:
+    fetch_reports = {}
+    for name, _, _, sources, fetch_report in collection_results:
         skipped_sources.update(sources)
+        fetch_reports[name] = fetch_report
 
     # 4. Generate and output the final markdown digest
     today = datetime.now(timezone.utc)
     document_generator = DocumentGenerator(global_config.output_settings, global_config)
     final_markdown_digest = document_generator.generate_markdown_digest(
-        collection_summaries, articles_by_collection, list(skipped_sources), today
+        collection_summaries, articles_by_collection, list(skipped_sources), today, fetch_reports
     )
 
     # 5. Output the digest based on global settings
@@ -201,6 +230,36 @@ async def main():
             f"Warning: Unknown output type '{output_type}'. Digest only printed to console."
         )
 
+    # Print feed processing summary
+    print("\n=== FEED PROCESSING SUMMARY ===")
+    total_successful = 0
+    total_failed = 0
+    total_articles = 0
+    
+    for collection_name, report in fetch_reports.items():
+        successful_count = len(report['successful'])
+        failed_count = len(report['failed'])
+        articles_count = sum(s['articles_fetched'] for s in report['successful'])
+        
+        total_successful += successful_count
+        total_failed += failed_count
+        total_articles += articles_count
+        
+        success_rate = successful_count / (successful_count + failed_count) if (successful_count + failed_count) > 0 else 0
+        print(f"{collection_name}: {successful_count}/{successful_count + failed_count} feeds successful ({success_rate:.1%}) • {articles_count} articles")
+        
+        if failed_count > 0:
+            print(f"  Failed feeds in {collection_name}:")
+            for failed_feed in report['failed']:
+                print(f"    - {failed_feed['name']}: {failed_feed['error']}")
+                print(f"      URL: {failed_feed['url']}")
+    
+    overall_success_rate = total_successful / (total_successful + total_failed) if (total_successful + total_failed) > 0 else 0
+    print(f"\nOVERALL: {total_successful}/{total_successful + total_failed} feeds successful ({overall_success_rate:.1%}) • {total_articles} total articles")
+    
+    if total_failed > 0:
+        print(f"\n⚠️  {total_failed} feeds failed. Check the detailed report in the digest for URLs to potentially remove.")
+
     # 6. Only save articles to history after digest has been successfully output
     # This ensures that if any step fails, no articles are marked as processed
     for collection_file in collection_files:
@@ -208,6 +267,21 @@ async def main():
         collection_name = collection_config.name
         if collection_name in articles_by_collection and articles_by_collection[collection_name]:
             rss_fetcher = RSSFetcher(feeds=collection_config.feeds)
+            
+            # Get all articles that were fetched for this collection, not just summarized ones
+            all_processed_articles = []
+            for name, _, articles, _, _ in collection_results:
+                if name == collection_name:
+                    all_processed_articles.extend(articles)
+
+            # We save all articles that were selected for fetching, not just the ones that were successfully summarized.
+            # This prevents them from being re-processed in the next run.
+            articles_to_save = [
+                article 
+                for article in all_processed_articles 
+                if article in articles_by_collection[collection_name]
+            ]
+
             rss_fetcher.save_selected_articles_to_history(
                 collection_name, articles_by_collection[collection_name]
             )
