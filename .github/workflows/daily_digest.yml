@@ -29,9 +29,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: history/
-          key: ${{ runner.os }}-history-${{ github.ref }}
+          key: article-history-cache
           restore-keys: |
-            ${{ runner.os }}-history-
+            article-history-cache
 
       - name: Set up Python
         uses: actions/setup-python@v5
