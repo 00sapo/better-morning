@@ -1,32 +1,27 @@
 name = "Locale"
 
-[[feeds]]
-url = "https://laprovinciapavese.gelocal.it/rss/finegil/laprovinciapavese/feed.rss"
-name = "La Provincia Pavese"
-max_articles = 40
-
-[[feeds]]
-url = "https://www.ilgiorno.it/pavia/rss"
-name = "Il Giorno Pavia"
-max_articles = 40
-
-[[feeds]]
-url = "https://www.fanpage.it/milano/feed"
-name = "Fanpage Milano"
-max_articles = 20
+# [[feeds]]
+# url = "https://laprovinciapavese.gelocal.it/rss/finegil/laprovinciapavese/feed.rss"
+# name = "La Provincia Pavese"
+# max_articles = 40
+#
+# [[feeds]]
+# url = "https://www.ilgiorno.it/pavia/rss"
+# name = "Il Giorno Pavia"
+# max_articles = 40
 
 [[feeds]]
 url = "https://primapavia.it/feed"
 name = "Prima Pavia"
-max_articles = 20
+max_articles = 5
 
-[[feeds]]
-url = "https://www.ilgiorno.it/milano/rss"
-name = "Il Giorno Milano"
-max_articles = 20
+# [[feeds]]
+# url = "https://www.ilgiorno.it/milano/rss"
+# name = "Il Giorno Milano"
+# max_articles = 20
 
 [llm_settings]
-n_most_important_news = 5
+n_most_important_news = 2
 k_words_each_summary = 150
 
 [content_extraction_settings]
