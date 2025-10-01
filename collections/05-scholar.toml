@@ -3,10 +3,10 @@ name = "Google Scholar"
 [[feeds]]
 url = "https://kill-the-newsletter.com/feeds/u1qj9xi4h8i0ka4g2qo0.xml"
 name = "Google Scholar Alerts"
-max_articles = 30
+max_articles = 5
 
 [llm_settings]
-n_most_important_news = 30
+n_most_important_news = 5
 k_words_each_summary = 150
 
 [content_extraction_settings]

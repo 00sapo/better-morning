@@ -58,7 +58,7 @@ name = "ZNet"
 max_articles = 40
 
 [llm_settings]
-n_most_important_news = 15
-k_words_each_summary = 200
+n_most_important_news = 8
+k_words_each_summary = 150
 
 collection_prompt = "Una panoramica completa ma concisa delle notizie *politiche*, *opinioni politiche* e *commenti* questi articoli. Questa rassegna ha *due* sotto-sezioni con titoli \"Italia\" e \"Mondo\" e le notizie suddivise equamente. Le uniche notizie incluse *devono essere di politica*."
