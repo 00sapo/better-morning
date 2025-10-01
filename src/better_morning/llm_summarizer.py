@@ -29,7 +29,7 @@ class LLMSummarizer:
                 self.settings.api_key = None
 
     async def select_articles_for_fetching(
-        self, articles: List[Article]
+        self, articles: List[Article], collection_prompt: Optional[str] = None
     ) -> List[Article]:
         """
         Uses the reasoner LLM to select the most relevant articles for content fetching
@@ -57,6 +57,7 @@ class LLMSummarizer:
         prompt = f"""
 From the following list of articles, select the top {num_to_select} most relevant and important ones to fetch and summarize.
 Provide your answer as a JSON object with a single key "selected_indices" containing a list of the chosen article numbers (e.g., [1, 5, 10]).
+The selected articles will be included in a news digest summary that responds to this description: "{collection_prompt or "A general news digest."}"
 
 Articles:
 {articles_str}
@@ -280,7 +281,7 @@ Articles:
         # 2. Build the final prompt for the collection overview
         user_guideline = ""
         if collection_prompt:
-            user_guideline = f"Additionally, please follow this specific guideline: '{collection_prompt}'"
+            user_guideline = f"The final summary MUST respond to this description: *{collection_prompt}*"
 
         collection_summary_prompt = (
             f"From the following list of article summaries, please identify the {self.settings.n_most_important_news} "
