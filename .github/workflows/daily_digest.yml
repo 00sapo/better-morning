@@ -3,9 +3,8 @@ name: Daily News Digest
 on:
   workflow_dispatch: # Allows manual triggering
   schedule:
-    - cron: "30 6 * * *" # Runs daily at 06:30 UTC (8:30 CEST)
-    - cron: "30 15 * * *" # Runs daily at 15:30 UTC (17:30 CEST)
-
+    - cron: "30 6,15 * * *" # Runs daily at 06:30 and 15:30 UTC (8:30 and 17:30 CEST)
+    
 env:
   PYTHONUNBUFFERED: "1" # Ensure Python output is unbuffered
   # These will be populated from GitHub Secrets
