@@ -28,10 +28,10 @@ class OutputSettings(BaseModel):
     output_type: Literal["github_release", "email"] = "github_release"
     smtp_server: Optional[str] = None
     smtp_port: Optional[int] = 587
-    smtp_username_env: Optional[str] = None  # Env var name for SMTP username
-    smtp_password_env: Optional[str] = None  # Env var name for SMTP password
-    recipient_email_env: Optional[str] = None  # Env var name for recipient email
-    github_token_env: Optional[str] = "GH_TOKEN"  # Env var name for GitHub token
+    smtp_username_env: Optional[str] = "BETTER_MORNING_SMTP_USERNAME"
+    smtp_password_env: Optional[str] = "BETTER_MORNING_SMTP_PASSWORD"
+    recipient_email_env: Optional[str] = "BETTER_MORNING_RECIPIENT_EMAIL"
+    github_token_env: Optional[str] = "BETTER_MORNING_GITHUB_TOKEN"
 
 
 # --- Global Configuration ---

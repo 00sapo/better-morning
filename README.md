@@ -36,10 +36,15 @@ Create a `config.toml` file in the root of your repository (if it doesn't alread
 ```toml
 # filepath: config.toml
 [llm_settings]
-model = "gpt-4o"  # Use any litellm-supported model
+# Use any litellm-supported model
+reasoner_model = "openai/gpt-4o"  # model used for selecting articles and for the final summaries
+light_model = "openai/gpt-3.5-turbo" # model used for summarizing individual articles
 temperature = 0.7
-n_most_important_news = 5
-k_words_each_summary = 100
+output_language = "Italian"
+n_most_important_news = 5 # how many articles to include in the final summary of each section (can be changed at the collection level)
+k_words_each_summary = 100 # how many words to use in each article summary (can be changed at the collection level)
+
+# prompt template is optional, if not provided a default prompt will be used, which is like this
 prompt_template = """Summarize this article concisely in exactly {k_words_each_summary} words:
 
 Title: {title}
@@ -48,25 +53,15 @@ Content: {content}
 Summary:"""
 
 [content_extraction_settings]
+# you can set this to true to follow article links that are inside the content of the article,
+# useful for including alerts and list of news
+# you can also set this at the colelction and feed levels in collections/*.toml
 follow_article_links = false
-parser_type = "html.parser"
 
 [output_settings]
-output_type = "email"                              # Options: "github_release", "email"
-github_repo_slug_env = "GITHUB_REPOSITORY"
-github_token_env = "BETTER_MORNING_GITHUB_TOKEN"
-recipient_email_env = "BETTER_MORNING_RECIPIENT_EMAIL"  # Required if output_type is "email"
+output_type = "email"                              # Options: "github_release", "email", github_release is not working
 smtp_server = "smtp.gmail.com"                     # Required if output_type is "email"
 smtp_port = 587                                    # Required if output_type is "email"
-smtp_username_env = "BETTER_MORNING_SMTP_USERNAME" # Required if output_type is "email"
-smtp_password_env = "BETTER_MORNING_SMTP_PASSWORD" # Required if output_type is "email"
-
-[secrets_env_names]
-llm_api_key = "BETTER_MORNING_LLM_API_KEY"
-github_token = "BETTER_MORNING_GITHUB_TOKEN"
-smtp_username = "BETTER_MORNING_SMTP_USERNAME"
-smtp_password = "BETTER_MORNING_SMTP_PASSWORD"
-recipient_email = "BETTER_MORNING_RECIPIENT_EMAIL"
 ```
 
 ### 3. Define RSS Feed Collections (`collections/*.toml`)
@@ -90,6 +85,7 @@ name = "The Guardian"
 [[feeds]]
 url = "https://www.bbc.com/news/rss/newsonline_world_edition/front_page/rss.xml"
 name = "BBC World News"
+follow_article_links = false # override parent setting for this feed only
 
 [llm_settings]
 n_most_important_news = 5
@@ -97,8 +93,8 @@ k_words_each_summary = 100
 prompt_template = "Summarize this news article for a general audience: {title}. Content: {content}"
 
 [content_extraction_settings]
-follow_article_links = true
-parser_type = "html.parser"
+follow_article_links = true # if the article content contains links, this will follow them (you can enable this at the feed level only also)
+link_filter_pattern = "https:\\/\\/scholar.google.com\\/scholar_url\\?url=.+" # this is a regex pattern to filter links to follow
 
 collection_prompt = "Provide a comprehensive but concise overview of the most significant global news from various sources."
 ```
