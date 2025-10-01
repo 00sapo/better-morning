@@ -43,4 +43,4 @@ k_words_each_summary = 300
 follow_article_links = false
 parser_type = "html.parser"
 
-collection_prompt = "Fornisci una panoramica completa ma concisa delle notizie, opinioni, commenti e prospettive presentate in questi articoli."
+collection_prompt = "Una panoramica completa ma concisa delle notizie, opinioni, commenti e prospettive presentate in questi articoli."

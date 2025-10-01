@@ -33,4 +33,4 @@ k_words_each_summary = 150
 follow_article_links = false
 parser_type = "html.parser"
 
-collection_prompt = "Crea una panoramica completa ma concisa delle notizie, prospettive, e opinioni presentate in questi articoli. Presta particolare attenzione alle notizie riguardanti i post-dottorati, assegni e incarichi di ricerca, bandi per progetti di ricerca, e riforme del sistema universitario."
+collection_prompt = "Una panoramica completa ma concisa delle notizie, prospettive, e opinioni presentate in questi articoli. Questa rassegna presta particolare attenzione alle notizie riguardanti i post-dottorati, assegni e incarichi di ricerca, bandi per progetti di ricerca, e riforme del sistema universitario. Le notizie devono essere attuali e pertinenti."
