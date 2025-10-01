@@ -2,7 +2,7 @@ import requests
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import Dict, List
+from typing import Dict, List, Optional
 from datetime import datetime
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -25,14 +25,14 @@ class DocumentGenerator:
         articles_by_collection: Dict[str, List[Article]],
         skipped_sources: List[str],
         date: datetime,
-        fetch_reports: Dict[str, dict] = None,
+        fetch_reports: Optional[Dict[str, dict]] = None,
     ) -> str:
         """Formats the digest with a top-level overview and detailed summaries."""
         title = f"# Daily Digest - {date.strftime('%Y-%m-%d')}"
 
         # Build the General Overview from individual collection summaries
         overview_parts = ["## General Overview"]
-        for collection_name, summary in sorted(collection_summaries.items()):
+        for collection_name, summary in collection_summaries.items():
             overview_parts.append(f"\n### {collection_name}\n")
             overview_parts.append(summary)
         overview_section = "\n".join(overview_parts)
@@ -44,27 +44,35 @@ class DocumentGenerator:
             all_failed = []
             total_articles = 0
             total_feeds = 0
-            
+
             for collection_name, report in fetch_reports.items():
-                all_successful.extend([(s, collection_name) for s in report['successful']])
-                all_failed.extend([(f, collection_name) for f in report['failed']])
-                total_articles += sum(s['articles_fetched'] for s in report['successful'])
-                total_feeds += report['total_feeds']
-            
-            success_rate = len(all_successful) / total_feeds if total_feeds > 0 else 0
-            
+                all_successful.extend(
+                    [(s, collection_name) for s in report["successful"]]
+                )
+                all_failed.extend([(f, collection_name) for f in report["failed"]])
+                total_articles += sum(
+                    s["articles_fetched"] for s in report["successful"]
+                )
+                total_feeds += report["total_feeds"]
+
+            success_rate = (
+                len(all_successful) / total_feeds if total_feeds > 0 else 0
+            )
+
             feed_report_section = f"\n## Feed Processing Report\n\n"
             feed_report_section += f"**Summary**: {len(all_successful)}/{total_feeds} feeds successful ({success_rate:.1%}) • {total_articles} articles fetched\n\n"
-            
+
             if all_successful:
                 feed_report_section += "### ✅ Successful Feeds\n\n"
-                for (feed, collection) in all_successful:
+                for feed, collection in all_successful:
                     feed_report_section += f"- **{feed['name']}** ({collection}): {feed['articles_fetched']} articles\n  `{feed['url']}`\n\n"
-            
+
             if all_failed:
                 feed_report_section += "### ❌ Failed Feeds\n\n"
-                feed_report_section += "*Consider removing these feeds from your collections:*\n\n"
-                for (feed, collection) in all_failed:
+                feed_report_section += (
+                    "*Consider removing these feeds from your collections:*\n\n"
+                )
+                for feed, collection in all_failed:
                     feed_report_section += f"- **{feed['name']}** ({collection}): {feed['error']}\n  `{feed['url']}`\n\n"
 
         skipped_sources_section = ""
@@ -74,10 +82,12 @@ class DocumentGenerator:
                 skipped_sources_section += f"- {source}\n"
 
         detailed_sections = ["## Detailed Summaries"]
-        for collection_name, articles in sorted(articles_by_collection.items()):
+        for collection_name, articles in articles_by_collection.items():
             # Filter out articles that might have failed summarization
             valid_articles = [
-                a for a in articles if a.summary and not a.summary.startswith("[Error:")
+                a
+                for a in articles
+                if a.summary and not a.summary.startswith("[Error:")
             ]
             if not valid_articles:
                 continue
@@ -100,6 +110,7 @@ class DocumentGenerator:
     def send_via_email(self, subject: str, body: str, recipient_email: str):
         if (
             not self.output_settings.smtp_server
+            or not self.output_settings.smtp_port
             or not self.output_settings.smtp_username_env
             or not self.output_settings.smtp_password_env
         ):
