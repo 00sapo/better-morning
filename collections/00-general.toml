@@ -58,7 +58,7 @@ name = "ZNet"
 max_articles = 40
 
 [llm_settings]
-n_most_important_news = 7
-k_words_each_summary = 100
+n_most_important_news = 15
+k_words_each_summary = 200
 
-collection_prompt = "Fornisci una panoramica completa ma concisa delle notizie *politiche*, *opinioni politiche* e *commenti* questi articoli. Crea *due* sezioni: \"Italia\" e \"Mondo\" e suddividi le notizie equamente. Le uniche notizie incluse *devono essere di politica*."
+collection_prompt = "Fornisci una panoramica completa ma concisa delle notizie *politiche*, *opinioni politiche* e *commenti* questi articoli. Crea *due* sotto-sezioni con titoli \"Italia\" e \"Mondo\" e suddividi le notizie equamente. Le uniche notizie incluse *devono essere di politica*."
