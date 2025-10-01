@@ -36,8 +36,8 @@ name = "Jacobin Italia"
 max_articles = 2
 
 [llm_settings]
-n_most_important_news = 2
-k_words_each_summary = 150
+n_most_important_news = 5
+k_words_each_summary = 300
 
 [content_extraction_settings]
 follow_article_links = false
