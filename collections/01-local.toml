@@ -26,8 +26,8 @@ name = "Il Giorno Milano"
 max_articles = 20
 
 [llm_settings]
-n_most_important_news = 3
-k_words_each_summary = 100
+n_most_important_news = 5
+k_words_each_summary = 150
 
 [content_extraction_settings]
 collection_prompt = "Fornisci una panoramica completa ma concisa delle notizie di natura *politica*. *Elimina* tutto ciò che riguarda la cronaca nera, gli eventi locali, le notizie sportive e culturali, a meno che non abbiano un impatto significativo sulla politica di Pavia e/o della Lombardia. *Non includere* notizie di livello nazionale o internazionale."
