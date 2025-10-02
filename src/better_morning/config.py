@@ -14,6 +14,8 @@ class LLMSettings(BaseModel):
     k_words_each_summary: int = 100
     prompt_template: Optional[str] = None  # Collection-specific prompt or for filtering
     output_language: str = "english"  # Added language setting
+    thinking_effort_reasoner: Optional[Union[int, str]] = None  # Thinking effort for reasoner model (tokens or effort level)
+    thinking_effort_light: Optional[Union[int, str]] = None  # Thinking effort for light model (tokens or effort level)
     api_key: Optional[str] = None  # To hold the resolved API key
 
 

@@ -5,6 +5,8 @@ temperature = 0.5
 n_most_important_news = 10
 k_words_each_summary = 150
 output_language = "italian"
+thinking_effort_reasoner = "8192"
+thinking_effort_light = "0"
 prompt_template = """Riassumi il seguente articolo includendo i fatti e le opinioni chiave, in esattamente {k_words_each_summary} parole:
 
 Titolo: {title}

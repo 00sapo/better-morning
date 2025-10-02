@@ -1,0 +1,2 @@
+- To test, use `.venv/bin/python`.
+- Use `run.sh` to run with proper environment variables for sending emails and access llms

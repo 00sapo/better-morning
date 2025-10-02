@@ -40,12 +40,14 @@ Create a `config.toml` file in the root of your repository (if it doesn't alread
 # Use any litellm-supported model
 reasoner_model = "openai/gpt-4o"  # model used for selecting articles and for the final summaries
 light_model = "openai/gpt-3.5-turbo" # model used for summarizing individual articles
+# thinking_effort_reasoner/thinking_effort_light; conversion from string to integer is done by
+# llmlite
+thinking_effort_light = "medium"
+thinking_effort_reasoner = "8192"
+
+# optionals:
 temperature = 0.7
 output_language = "Italian"
-n_most_important_news = 5 # how many articles to include in the final summary of each section (can be changed at the collection level)
-k_words_each_summary = 100 # how many words to use in each article summary (can be changed at the collection level)
-
-# prompt template is optional, if not provided a default prompt will be used, which is like this
 prompt_template = """Summarize this article concisely in exactly {k_words_each_summary} words:
 
 Title: {title}
@@ -57,6 +59,7 @@ Summary:"""
 # you can set this to true to follow article links that are inside the content of the article,
 # useful for including alerts and list of news
 # you can also set this at the colelction and feed levels in collections/*.toml
+# default is false
 follow_article_links = false
 
 [output_settings]
@@ -106,10 +109,12 @@ collection_prompt = "Provide a comprehensive but concise overview of the most si
 You can control how old articles are allowed to be for each collection using the `max_age` setting in your collection TOML files. This helps ensure your digest only includes recent or relevant news.
 
 **Supported formats:**
+
 - **Time span:** e.g. `2d` (2 days), `1h` (1 hour), `30m` (30 minutes), `7d` (7 days)
 - **Special value:** `last-digest` — Only include articles published after the last successful digest for this collection (uses a cached timestamp).
 
 **Example:**
+
 ```toml
 # filepath: collections/recent_news.toml
 name = "Recent News Only"
@@ -122,6 +127,7 @@ max_articles = 10
 ```
 
 **How `last-digest` works:**
+
 - When you set `max_age = "last-digest"`, the system remembers the time of the last successful digest for each collection.
 - On the next run, only articles newer than that time are included.
 - The timestamp is cached in a file under `history/` and persists across runs (including GitHub Actions and local runs).

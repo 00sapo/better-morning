@@ -67,14 +67,24 @@ Articles:
             print(
                 f"Asking LLM to select the best {num_to_select} articles from a list of {len(articles)}..."
             )
-            response = await litellm.acompletion(
-                model=self.settings.reasoner_model,
-                messages=[{"content": prompt, "role": "user"}],
-                temperature=self.settings.temperature,
-                response_format={"type": "json_object"},
-                api_key=self.settings.api_key,
-                timeout=180,
-            )
+            # Prepare completion parameters
+            completion_params = {
+                "model": self.settings.reasoner_model,
+                "messages": [{"content": prompt, "role": "user"}],
+                "temperature": self.settings.temperature,
+                "response_format": {"type": "json_object"},
+                "api_key": self.settings.api_key,
+                "timeout": 180,
+            }
+            
+            # Add thinking effort for reasoner model if configured
+            if self.settings.thinking_effort_reasoner is not None:
+                if isinstance(self.settings.thinking_effort_reasoner, int):
+                    completion_params["thinking"] = {"type": "enabled", "budget_tokens": self.settings.thinking_effort_reasoner}
+                else:
+                    completion_params["reasoning_effort"] = self.settings.thinking_effort_reasoner
+            
+            response = await litellm.acompletion(**completion_params)
             choice = response.choices[0].message.content
             selected_data = json.loads(choice)
             selected_indices = selected_data.get("selected_indices", [])
@@ -197,13 +207,23 @@ Articles:
             print(
                 f"Summarizing '{article.title}' with model '{self.settings.light_model}'. API Key: {self._get_masked_api_key()}"
             )
-            response = await litellm.acompletion(
-                model=self.settings.light_model,
-                messages=messages,
-                temperature=self.settings.temperature,
-                api_key=self.settings.api_key,
-                timeout=120,  # Add a 2-minute timeout
-            )
+            # Prepare completion parameters
+            completion_params = {
+                "model": self.settings.light_model,
+                "messages": messages,
+                "temperature": self.settings.temperature,
+                "api_key": self.settings.api_key,
+                "timeout": 120,  # Add a 2-minute timeout
+            }
+            
+            # Add thinking effort for light model if configured
+            if self.settings.thinking_effort_light is not None:
+                if isinstance(self.settings.thinking_effort_light, int):
+                    completion_params["thinking"] = {"type": "enabled", "budget_tokens": self.settings.thinking_effort_light}
+                else:
+                    completion_params["reasoning_effort"] = self.settings.thinking_effort_light
+            
+            response = await litellm.acompletion(**completion_params)
             summary_text = response.choices[0].message.content
             article.summary = f"{summary_text.strip()}\n\n[{article.feed_name or 'Source'}]({article.link})"
             return article
@@ -230,13 +250,28 @@ Articles:
         messages = [{"role": "user", "content": truncated_prompt}]
 
         try:
-            response = await litellm.acompletion(
-                model=model_name,
-                messages=messages,
-                temperature=self.settings.temperature,
-                api_key=self.settings.api_key,
-                timeout=timeout,  # Add a 2-minute timeout
-            )
+            # Prepare completion parameters
+            completion_params = {
+                "model": model_name,
+                "messages": messages,
+                "temperature": self.settings.temperature,
+                "api_key": self.settings.api_key,
+                "timeout": timeout,  # Add a 2-minute timeout
+            }
+            
+            # Add thinking effort based on which model is being used
+            if model_name == self.settings.reasoner_model and self.settings.thinking_effort_reasoner is not None:
+                if isinstance(self.settings.thinking_effort_reasoner, int):
+                    completion_params["thinking"] = {"type": "enabled", "budget_tokens": self.settings.thinking_effort_reasoner}
+                else:
+                    completion_params["reasoning_effort"] = self.settings.thinking_effort_reasoner
+            elif model_name == self.settings.light_model and self.settings.thinking_effort_light is not None:
+                if isinstance(self.settings.thinking_effort_light, int):
+                    completion_params["thinking"] = {"type": "enabled", "budget_tokens": self.settings.thinking_effort_light}
+                else:
+                    completion_params["reasoning_effort"] = self.settings.thinking_effort_light
+            
+            response = await litellm.acompletion(**completion_params)
             return response.choices[0].message.content or ""
         except Exception as e:
             print(f"Error summarizing text content '{title}' with LLM: {e}")
