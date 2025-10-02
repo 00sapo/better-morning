@@ -190,10 +190,6 @@ export BETTER_MORNING_LLM_API_KEY="sk-your-llm-api-key"
 ./.venv/bin/python run_local.py
 ```
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to open issues or submit pull requests.
-
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the GPL v3 License - see the LICENSE file for details.
