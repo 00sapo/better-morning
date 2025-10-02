@@ -1,13 +1,14 @@
 from typing import List, Optional
 from pydantic import BaseModel, HttpUrl
 import feedparser
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import email.utils
 import json
 import os
 import time
 import random
 from urllib.parse import urlparse
+import re
 
 from .config import RSSFeed
 
@@ -16,7 +17,7 @@ class Article(BaseModel):
     id: str  # Unique identifier, e.g., link
     title: str
     link: HttpUrl
-    source_url: HttpUrl = None
+    source_url: Optional[HttpUrl] = None
     feed_name: Optional[str] = None
     published_date: datetime
     summary: Optional[str] = None
@@ -28,12 +29,12 @@ class Article(BaseModel):
 
 # Custom JSON encoder for datetime objects
 class ArticleEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        if isinstance(obj, HttpUrl):
-            return str(obj)
-        return json.JSONEncoder.default(self, obj)
+    def default(self, o):
+        if isinstance(o, datetime):
+            return o.isoformat()
+        if isinstance(o, HttpUrl):
+            return str(o)
+        return json.JSONEncoder.default(self, o)
 
 
 class RSSFetcher:
@@ -48,6 +49,86 @@ class RSSFetcher:
         history_dir = "history"
         os.makedirs(history_dir, exist_ok=True)
         return os.path.join(history_dir, f"{collection_name}_articles.json")
+    
+    def _get_digest_history_file_path(self, collection_name: str) -> str:
+        history_dir = "history"
+        os.makedirs(history_dir, exist_ok=True)
+        return os.path.join(history_dir, f"{collection_name}_digest_history.json")
+    
+    def _parse_time_span(self, time_span: str) -> timedelta:
+        """Parse time span like '1h', '2d', '30m' into timedelta."""
+        match = re.match(r'^(\d+)([hdm])$', time_span)
+        if not match:
+            raise ValueError(f"Invalid time span format: {time_span}")
+        
+        value, unit = match.groups()
+        value = int(value)
+        
+        if unit == 'h':
+            return timedelta(hours=value)
+        elif unit == 'd':
+            return timedelta(days=value)
+        elif unit == 'm':
+            return timedelta(minutes=value)
+        
+        raise ValueError(f"Unknown time unit: {unit}")
+    
+    def _get_last_digest_time(self, collection_name: str) -> Optional[datetime]:
+        """Get the timestamp of the last digest for this collection."""
+        digest_history_file = self._get_digest_history_file_path(collection_name)
+        if not os.path.exists(digest_history_file):
+            return None
+        
+        try:
+            with open(digest_history_file, "r") as f:
+                data = json.load(f)
+                last_digest_str = data.get("last_digest_time")
+                if last_digest_str:
+                    return datetime.fromisoformat(last_digest_str)
+        except (json.JSONDecodeError, ValueError, KeyError):
+            return None
+        
+        return None
+    
+    def save_digest_time(self, collection_name: str, digest_time: datetime):
+        """Save the timestamp when the digest was created."""
+        digest_history_file = self._get_digest_history_file_path(collection_name)
+        data = {"last_digest_time": digest_time.isoformat()}
+        
+        with open(digest_history_file, "w") as f:
+            json.dump(data, f, indent=4)
+    
+    def _calculate_cutoff_date(self, max_age: Optional[str], collection_name: str) -> Optional[datetime]:
+        """Calculate the cutoff date based on max_age setting."""
+        if not max_age:
+            return None
+        
+        current_time = datetime.now(timezone.utc)
+        
+        if max_age == "last-digest":
+            last_digest_time = self._get_last_digest_time(collection_name)
+            return last_digest_time
+        else:
+            # Parse time span and calculate cutoff
+            try:
+                time_delta = self._parse_time_span(max_age)
+                return current_time - time_delta
+            except ValueError as e:
+                print(f"Warning: Invalid max_age format '{max_age}': {e}")
+                return None
+    
+    def _is_article_too_old(self, article_date: datetime, cutoff_date: Optional[datetime]) -> bool:
+        """Check if an article is older than the cutoff date."""
+        if cutoff_date is None:
+            return False
+        
+        # Ensure both dates are timezone-aware for comparison
+        if article_date.tzinfo is None:
+            article_date = article_date.replace(tzinfo=timezone.utc)
+        if cutoff_date.tzinfo is None:
+            cutoff_date = cutoff_date.replace(tzinfo=timezone.utc)
+        
+        return article_date < cutoff_date
 
     def _load_historical_articles(self, collection_name: str) -> List[Article]:
         history_file = self._get_history_file_path(collection_name)
@@ -119,10 +200,11 @@ class RSSFetcher:
         """Fetch RSS feed with exponential backoff retry logic."""
         import socket
         
+        original_timeout = socket.getdefaulttimeout()
+        
         for attempt in range(max_retries):
             try:
                 # Set socket timeout
-                original_timeout = socket.getdefaulttimeout()
                 socket.setdefaulttimeout(timeout)
                 
                 # Parse the feed
@@ -132,8 +214,9 @@ class RSSFetcher:
                 socket.setdefaulttimeout(original_timeout)
                 
                 # Check if feed was successfully parsed
-                if hasattr(feed, 'status') and feed.status >= 400:
-                    raise Exception(f"HTTP error {feed.status}")
+                status = getattr(feed, 'status', None)
+                if status is not None and status >= 400:
+                    raise Exception(f"HTTP error {status}")
                 
                 if not feed.entries and hasattr(feed, 'bozo') and feed.bozo:
                     raise Exception(f"Feed parsing error: {getattr(feed, 'bozo_exception', 'Unknown error')}")
@@ -160,7 +243,7 @@ class RSSFetcher:
         
         return None
 
-    def _record_fetch_result(self, feed_config: RSSFeed, success: bool, error_msg: str = None, article_count: int = 0):
+    def _record_fetch_result(self, feed_config: RSSFeed, success: bool, error_msg: Optional[str] = None, article_count: int = 0):
         """Record the result of a feed fetch attempt."""
         feed_key = str(feed_config.url)
         if feed_key not in self.fetch_stats:
@@ -206,7 +289,7 @@ class RSSFetcher:
             'success_rate': len(successful) / len(self.fetch_stats) if self.fetch_stats else 0
         }
 
-    def fetch_articles(self, collection_name: str) -> List[Article]:
+    def fetch_articles(self, collection_name: str, max_age: Optional[str] = None) -> List[Article]:
         new_articles: List[Article] = []
         historical_articles = {
             article.id: article
@@ -215,6 +298,13 @@ class RSSFetcher:
         all_fetched_articles_for_history: List[Article] = list(
             historical_articles.values()
         )
+        
+        # Calculate cutoff date for age filtering
+        cutoff_date = self._calculate_cutoff_date(max_age, collection_name)
+        if cutoff_date:
+            print(f"Filtering articles older than {cutoff_date.isoformat()}")
+        else:
+            print("No age filtering applied")
 
         for feed_config in self.feeds:
             print(f"Fetching articles from {feed_config.name} ({feed_config.url})")
@@ -295,6 +385,11 @@ class RSSFetcher:
                             f"Warning: No 'published_parsed' found for article '{entry.title}'. Using current time."
                         )
                         published_date = datetime.now(timezone.utc)
+
+                    # Check if article is too old based on max_age setting
+                    if self._is_article_too_old(published_date, cutoff_date):
+                        print(f"Skipping article '{entry.title}' (published {published_date.isoformat()}) - older than cutoff")
+                        continue
 
                     # Prioritize 'content' over 'summary' if available, as it's often the full article.
                     # feedparser returns a list of content objects; we take the first one.

@@ -41,7 +41,7 @@ async def process_collection(
         await content_extractor.start_browser()
 
         # 1. Fetch new RSS articles
-        new_articles = rss_fetcher.fetch_articles(collection_config.name)
+        new_articles = rss_fetcher.fetch_articles(collection_config.name, collection_config.max_age)
         print(f"Found {len(new_articles)} new articles for {collection_config.name}.")
         if not new_articles:
             fetch_report = rss_fetcher.get_fetch_report()
@@ -233,9 +233,8 @@ async def main():
         repo_slug = os.getenv(
             "GITHUB_REPOSITORY"
         )  # e.g., 'owner/repo' from GitHub Actions
-        if not repo_slug or not os.getenv(
-            global_config.output_settings.github_token_env
-        ):
+        github_token_env = global_config.output_settings.github_token_env
+        if not repo_slug or not (github_token_env and os.getenv(github_token_env)):
             print(
                 "\nWARNING: GITHUB_REPOSITORY or GitHub Token environment variable not set. Skipping GitHub release. If running locally, this is expected.\n"
             )
@@ -257,11 +256,13 @@ async def main():
         except ValueError:
             recipient_email = None
 
+        smtp_username_env = global_config.output_settings.smtp_username_env
+        smtp_password_env = global_config.output_settings.smtp_password_env
         if (
             not recipient_email
             or not global_config.output_settings.smtp_server
-            or not os.getenv(global_config.output_settings.smtp_username_env)
-            or not os.getenv(global_config.output_settings.smtp_password_env)
+            or not (smtp_username_env and os.getenv(smtp_username_env))
+            or not (smtp_password_env and os.getenv(smtp_password_env))
         ):
             print(
                 "\nWARNING: Email configuration (recipient, SMTP server, or credentials) is incomplete. Skipping email. If running locally, this is expected.\n"
@@ -340,6 +341,10 @@ async def main():
             rss_fetcher.save_selected_articles_to_history(
                 collection_name, articles_by_collection[collection_name]
             )
+            
+            # Save the current digest timestamp for max_age="last-digest" functionality
+            rss_fetcher.save_digest_time(collection_name, today)
+            
             print(
                 f"Saved {len(articles_by_collection[collection_name])} articles to history for {collection_name}"
             )

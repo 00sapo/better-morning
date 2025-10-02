@@ -1,7 +1,8 @@
-from typing import List, Optional, Literal
-from pydantic import BaseModel, HttpUrl, Field
+from typing import List, Optional, Literal, Union
+from pydantic import BaseModel, HttpUrl, Field, validator
 import toml
 import os
+import re
 
 
 # --- LLM Settings ---
@@ -64,6 +65,19 @@ class CollectionOverrides(BaseModel):
     llm_settings: Optional[LLMSettings] = None
     content_extraction_settings: Optional[ContentExtractionSettings] = None
     collection_prompt: Optional[str] = None  # Prompt specific to this collection
+    max_age: Optional[Union[str, None]] = None  # Maximum age for articles (e.g., "2d", "24h", "last-digest")
+    
+    @validator('max_age')
+    def validate_max_age(cls, v):
+        if v is None:
+            return v
+        if v == "last-digest":
+            return v
+        # Validate time span format (e.g., "1h", "2d", "30m")
+        pattern = r'^(\d+)([hdm])$'
+        if not re.match(pattern, v):
+            raise ValueError("max_age must be 'last-digest' or a time span in format like '1h', '2d', '30m'")
+        return v
 
 
 # --- Fully resolved Collection Configuration ---
@@ -74,6 +88,7 @@ class Collection(BaseModel):
     llm_settings: LLMSettings
     content_extraction_settings: ContentExtractionSettings
     collection_prompt: Optional[str] = None
+    max_age: Optional[str] = None  # Maximum age for articles
 
 
 # --- Main Configuration Loader ---
@@ -129,6 +144,7 @@ def load_collection(collection_path: str, global_config: GlobalConfig) -> Collec
                 "content_extraction_settings"
             ),
             collection_prompt=collection_data.get("collection_prompt"),
+            max_age=collection_data.get("max_age"),
         )
 
         # Merge LLM settings: collection overrides global defaults
@@ -180,6 +196,7 @@ def load_collection(collection_path: str, global_config: GlobalConfig) -> Collec
             llm_settings=resolved_llm_settings,
             content_extraction_settings=resolved_content_extraction_settings,
             collection_prompt=overrides.collection_prompt,
+            max_age=overrides.max_age,
         )
     except Exception as e:
         print(

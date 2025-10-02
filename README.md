@@ -15,6 +15,7 @@
 - **Flexible Output**: Publish your daily digest as a GitHub Release or send it directly to your email.
 - **Token Management**: Automatically truncates content if it exceeds a specified token limit to prevent excessive LLM costs.
 - **Google Scholar Alerts**: Automatically retrieve articles from google scholar alerts.
+- **Article Age Filtering**: Only include recent articles using `max_age` (per collection).
 
 ## 🚀 Getting Started
 
@@ -73,6 +74,7 @@ Create TOML files in the `collections/` directory to define your news categories
 ```toml
 # filepath: collections/default_news.toml
 name = "General Daily News"
+max_age = "2d"  # Only include articles from the last 2 days (see below for details)
 
 [[feeds]]
 url = "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
@@ -94,12 +96,40 @@ prompt_template = "Summarize this news article for a general audience: {title}. 
 
 [content_extraction_settings]
 follow_article_links = true # if the article content contains links, this will follow them (you can enable this at the feed level only also)
-link_filter_pattern = "https:\\/\\/scholar.google.com\\/scholar_url\\?url=.+" # this is a regex pattern to filter links to follow
+link_filter_pattern = "https:\/\/scholar.google.com\/scholar_url\?url=.+" # this is a regex pattern to filter links to follow
 
 collection_prompt = "Provide a comprehensive but concise overview of the most significant global news from various sources."
 ```
 
-### 4. Set Up GitHub Secrets
+### Filtering Articles by Age (`max_age`)
+
+You can control how old articles are allowed to be for each collection using the `max_age` setting in your collection TOML files. This helps ensure your digest only includes recent or relevant news.
+
+**Supported formats:**
+- **Time span:** e.g. `2d` (2 days), `1h` (1 hour), `30m` (30 minutes), `7d` (7 days)
+- **Special value:** `last-digest` — Only include articles published after the last successful digest for this collection (uses a cached timestamp).
+
+**Example:**
+```toml
+# filepath: collections/recent_news.toml
+name = "Recent News Only"
+max_age = "2d"  # Only include articles from the last 2 days
+
+[[feeds]]
+url = "https://feeds.bbci.co.uk/news/rss.xml"
+name = "BBC News"
+max_articles = 10
+```
+
+**How `last-digest` works:**
+- When you set `max_age = "last-digest"`, the system remembers the time of the last successful digest for each collection.
+- On the next run, only articles newer than that time are included.
+- The timestamp is cached in a file under `history/` and persists across runs (including GitHub Actions and local runs).
+- If no previous digest exists, all articles are included on the first run.
+
+---
+
+## 4. Set Up GitHub Secrets
 
 For the GitHub Action to function, you need to configure secrets in your repository settings.
 
