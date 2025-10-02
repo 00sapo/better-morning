@@ -1,5 +1,7 @@
 name = "Commenti"
 
+max_age = "7d"
+
 [[feeds]]
 url = "https://magazine.scienceforthepeople.org/feed/"
 name = "Science for the People Magazine"

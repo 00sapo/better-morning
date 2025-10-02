@@ -1,5 +1,7 @@
 name = "General"
 
+max_age = "last-digest"
+
 [[feeds]]
 url = "https://cms.ilmanifesto.it/feed"
 name = "Il Manifesto"

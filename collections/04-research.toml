@@ -1,5 +1,7 @@
 name = "Research"
 
+max_age = "1d"
+
 [[feeds]]
 url = "https://www.sciencedaily.com/rss/top/science.xml"
 name = "Science Daily Top"

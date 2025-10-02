@@ -1,5 +1,7 @@
 name = "Politica Universitaria"
 
+max_age = "7d"
+
 [[feeds]]
 url = "https://www.roars.it/feed/"
 name = "ROARS"
