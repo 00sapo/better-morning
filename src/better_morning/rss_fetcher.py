@@ -34,6 +34,9 @@ class ArticleEncoder(json.JSONEncoder):
             return o.isoformat()
         if isinstance(o, HttpUrl):
             return str(o)
+        if isinstance(o, bytes):
+            # Don't serialize binary content to avoid large JSON files
+            return None
         return json.JSONEncoder.default(self, o)
 
 
