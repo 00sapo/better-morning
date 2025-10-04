@@ -24,7 +24,7 @@ max_articles = 20
 
 [llm_settings]
 n_most_important_news = 4
-k_words_each_summary = 75
+k_words_each_summary = 100
 
 [content_extraction_settings]
 collection_prompt = "Una panoramica completa ma concisa delle notizie di natura *politica*. Questa rassegna *esclude* tutto ciò che riguarda la cronaca nera, gli eventi locali, le notizie sportive e culturali, a meno che non abbiano un impatto significativo sulla politica di Pavia e/o della Lombardia. *Non include* notizie di livello nazionale o internazionale."
