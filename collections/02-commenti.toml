@@ -5,35 +5,35 @@ max_age = "7d"
 [[feeds]]
 url = "https://magazine.scienceforthepeople.org/feed/"
 name = "Science for the People Magazine"
-max_articles = 2
+max_articles = 3
 
 [[feeds]]
 url = "https://www.scienzainrete.it/rss"
 name = "Scienza in Rete"
-max_articles = 2
+max_articles = 3
 
 [[feeds]]
 url = "https://www.valigiablu.it/feed/"
 name = "Valigia Blu"
-max_articles = 2
+max_articles = 3
 
 [[feeds]]
 url = "https://www.vdnews.it/rss"
 name = "VDNews"
-max_articles = 2
+max_articles = 3
 
 [[feeds]]
 url = "https://contropiano.org/feed"
 name = "Contropiano"
-max_articles = 2
+max_articles = 3
 
 [[feeds]]
 url = "https://jacobinitalia.it/feed/"
 name = "Jacobin Italia"
-max_articles = 2
+max_articles = 3
 
 [llm_settings]
-n_most_important_news = 4
+n_most_important_news = 3
 k_words_each_summary = 200
 
 [content_extraction_settings]
