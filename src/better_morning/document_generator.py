@@ -42,8 +42,8 @@ class DocumentGenerator:
             print(f"Warning: Could not load digest history: {e}")
             return []
     
-    def save_digest_to_history(self, digest_content: str, date: datetime):
-        """Save the current digest to history, maintaining only the most recent digests."""
+    def save_digest_to_history(self, collection_summaries: Dict[str, str], date: datetime):
+        """Save only the collection summaries to history, without feed reports and detailed article summaries."""
         self._ensure_history_dir()
         
         # Load existing digests
@@ -55,10 +55,18 @@ class DocumentGenerator:
             except Exception as e:
                 print(f"Warning: Could not load existing digest history: {e}")
         
+        # Build a clean digest with only the collection summaries
+        clean_digest_parts = [f"# Daily Digest - {date.strftime('%Y-%m-%d')}", "## General Overview"]
+        for collection_name, summary in collection_summaries.items():
+            clean_digest_parts.append(f"\n### {collection_name}\n")
+            clean_digest_parts.append(summary)
+        
+        clean_digest_content = "\n".join(clean_digest_parts)
+        
         # Add the new digest
         new_digest = {
             "date": date.strftime('%Y-%m-%d'),
-            "content": digest_content
+            "content": clean_digest_content
         }
         all_digests.append(new_digest)
         

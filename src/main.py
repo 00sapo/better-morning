@@ -331,7 +331,7 @@ async def main():
         )
 
     # 6. Save the generated digest to history for future context
-    document_generator.save_digest_to_history(final_markdown_digest, today)
+    document_generator.save_digest_to_history(collection_summaries, today)
     print(f"Saved digest to history for future context")
 
     # 7. Only save articles to history after digest has been successfully output
