@@ -45,6 +45,7 @@ class GlobalConfig(BaseModel):
     token_size_threshold: int = 128 * 1024  # 128K tokens
     max_articles_per_collection: int = 100  # Global limit for articles per collection
     content_extraction_batch_size: int = 10  # Batch size for content extraction
+    context_digest_size: int = 3  # Number of previous digests to send as context to models
     llm_settings: LLMSettings = Field(default_factory=LLMSettings)
     content_extraction_settings: ContentExtractionSettings = Field(
         default_factory=ContentExtractionSettings

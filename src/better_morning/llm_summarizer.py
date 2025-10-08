@@ -29,7 +29,10 @@ class LLMSummarizer:
                 self.settings.api_key = None
 
     async def select_articles_for_fetching(
-        self, articles: List[Article], collection_prompt: Optional[str] = None
+        self,
+        articles: List[Article],
+        collection_prompt: Optional[str] = None,
+        previous_digests_context: Optional[str] = None,
     ) -> List[Article]:
         """
         Uses the reasoner LLM to select the most relevant articles for content fetching
@@ -54,11 +57,21 @@ class LLMSummarizer:
             )
         articles_str = "\n".join(article_lines)
 
-        prompt = f"""
-From the following list of articles, select the top {num_to_select} most relevant and important ones to fetch and summarize.
+        # Build the prompt with optional previous digests context
+        context_section = ""
+        if previous_digests_context:
+            context_section = f"{previous_digests_context}\n\n"
+
+        prompt = f"""From the following list of articles, select the top {num_to_select} most relevant and important ones according to the impact they have in the world.
 Provide your answer as a JSON object with a single key "selected_indices" containing a list of the chosen article numbers (e.g., [1, 5, 10]).
 The selected articles will be included in a news digest summary that responds to this description: "{collection_prompt or "A general news digest."}"
 
+{"IMPORTANT: Avoid repeating news that was already covered in the previous digests below. Focus on new developments and different stories. If there are no truly new stories, it is better to say so rather than repeat old news." if previous_digests_context else ""}"
+----------------
+Previous digests:
+{context_section}
+
+----------------
 Articles:
 {articles_str}
 """
@@ -76,14 +89,19 @@ Articles:
                 "api_key": self.settings.api_key,
                 "timeout": 180,
             }
-            
+
             # Add thinking effort for reasoner model if configured
             if self.settings.thinking_effort_reasoner is not None:
                 if isinstance(self.settings.thinking_effort_reasoner, int):
-                    completion_params["thinking"] = {"type": "enabled", "budget_tokens": self.settings.thinking_effort_reasoner}
+                    completion_params["thinking"] = {
+                        "type": "enabled",
+                        "budget_tokens": self.settings.thinking_effort_reasoner,
+                    }
                 else:
-                    completion_params["reasoning_effort"] = self.settings.thinking_effort_reasoner
-            
+                    completion_params["reasoning_effort"] = (
+                        self.settings.thinking_effort_reasoner
+                    )
+
             response = await litellm.acompletion(**completion_params)
             choice = response.choices[0].message.content
             selected_data = json.loads(choice)
@@ -215,14 +233,19 @@ Articles:
                 "api_key": self.settings.api_key,
                 "timeout": 120,  # Add a 2-minute timeout
             }
-            
+
             # Add thinking effort for light model if configured
             if self.settings.thinking_effort_light is not None:
                 if isinstance(self.settings.thinking_effort_light, int):
-                    completion_params["thinking"] = {"type": "enabled", "budget_tokens": self.settings.thinking_effort_light}
+                    completion_params["thinking"] = {
+                        "type": "enabled",
+                        "budget_tokens": self.settings.thinking_effort_light,
+                    }
                 else:
-                    completion_params["reasoning_effort"] = self.settings.thinking_effort_light
-            
+                    completion_params["reasoning_effort"] = (
+                        self.settings.thinking_effort_light
+                    )
+
             response = await litellm.acompletion(**completion_params)
             summary_text = response.choices[0].message.content
             article.summary = f"{summary_text.strip()}\n\n[{article.feed_name or 'Source'}]({article.link})"
@@ -258,19 +281,35 @@ Articles:
                 "api_key": self.settings.api_key,
                 "timeout": timeout,  # Add a 2-minute timeout
             }
-            
+
             # Add thinking effort based on which model is being used
-            if model_name == self.settings.reasoner_model and self.settings.thinking_effort_reasoner is not None:
+            if (
+                model_name == self.settings.reasoner_model
+                and self.settings.thinking_effort_reasoner is not None
+            ):
                 if isinstance(self.settings.thinking_effort_reasoner, int):
-                    completion_params["thinking"] = {"type": "enabled", "budget_tokens": self.settings.thinking_effort_reasoner}
+                    completion_params["thinking"] = {
+                        "type": "enabled",
+                        "budget_tokens": self.settings.thinking_effort_reasoner,
+                    }
                 else:
-                    completion_params["reasoning_effort"] = self.settings.thinking_effort_reasoner
-            elif model_name == self.settings.light_model and self.settings.thinking_effort_light is not None:
+                    completion_params["reasoning_effort"] = (
+                        self.settings.thinking_effort_reasoner
+                    )
+            elif (
+                model_name == self.settings.light_model
+                and self.settings.thinking_effort_light is not None
+            ):
                 if isinstance(self.settings.thinking_effort_light, int):
-                    completion_params["thinking"] = {"type": "enabled", "budget_tokens": self.settings.thinking_effort_light}
+                    completion_params["thinking"] = {
+                        "type": "enabled",
+                        "budget_tokens": self.settings.thinking_effort_light,
+                    }
                 else:
-                    completion_params["reasoning_effort"] = self.settings.thinking_effort_light
-            
+                    completion_params["reasoning_effort"] = (
+                        self.settings.thinking_effort_light
+                    )
+
             response = await litellm.acompletion(**completion_params)
             return response.choices[0].message.content or ""
         except Exception as e:
@@ -278,7 +317,10 @@ Articles:
             return f"[Error: Could not summarize text content '{title}']"
 
     async def summarize_articles_collection(
-        self, articles: List[Article], collection_prompt: Optional[str] = None
+        self,
+        articles: List[Article],
+        collection_prompt: Optional[str] = None,
+        previous_digests_context: Optional[str] = None,
     ) -> tuple[str, List[Article]]:
         if not articles:
             return "No articles to summarize for this collection.", []
@@ -316,16 +358,26 @@ Articles:
         # 2. Build the final prompt for the collection overview
         user_guideline = ""
         if collection_prompt:
-            user_guideline = f"The final summary MUST respond to this description: *{collection_prompt}*"
+            user_guideline = f"8. The final summary MUST respond to this description: *{collection_prompt}*"
+
+        # Add context from previous digests if available
+        context_section = ""
+        if previous_digests_context:
+            context_section = f"{previous_digests_context}\n\n"
 
         collection_summary_prompt = (
-            f"From the following list of article summaries, please identify the {self.settings.n_most_important_news} "
-            f"most important stories. Considering that the same story may be repeated in multitiple articles from different perspectives and with different details, write a cohesive and concise summary of those top stories. "
-            f"The final summary must be in {self.settings.output_language}. "
-            f"**Crucially, for every piece of information you include, you MUST cite the source using a Markdown link like this: ([feed name](Link)).** "
-            f"The final summary MUST be of {self.settings.k_words_each_summary * min(self.settings.n_most_important_news, len(effectively_summarized_articles))} words. "
+            f"Here are a few digests of previous news and some articles summarized. You should select the most important stories presented in the summarized articles below, avoiding previously covered stories.\n\n"
+            f"1. Identify the {self.settings.n_most_important_news} most important stories."
+            f"2. Considering that the same story may be repeated in multitiple articles from different perspectives and with different details, write a cohesive and concise summary of those top stories. "
+            f"3. The final summary must be in {self.settings.output_language}. "
+            f"4. **Crucially, for every piece of information you include, you MUST cite the source using a Markdown link like this: ([feed name](Link)).** "
+            f"5. The final summary MUST be of {self.settings.k_words_each_summary * min(self.settings.n_most_important_news, len(effectively_summarized_articles))} words. "
+            f"6. Answer with only the final summary, without introductions nor conclusions. "
+            f"7. {'IMPORTANT: Avoid repeating news that was already covered in the previous digests below. Focus on new developments and different stories. If there are no truly new stories, it is better to say so rather than repeat old news.' if previous_digests_context else ''}\n\n"
             f"{user_guideline}\n\n"
-            f"Answer with only the final summary, without introductions nor conclusions. Here are the summaries:\n{concatenated_summaries}"
+            f"Previous digests:\n"
+            f"{context_section}\n\n----------------"
+            f"Article summaries:\n\n{concatenated_summaries}"
         )
 
         final_summary = await self._summarize_text_content(

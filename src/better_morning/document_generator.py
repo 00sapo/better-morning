@@ -9,6 +9,9 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import requests
 import markdown2
+import json
+import os
+from pathlib import Path
 
 from .config import OutputSettings, GlobalConfig, get_secret
 from .rss_fetcher import Article
@@ -18,6 +21,71 @@ class DocumentGenerator:
     def __init__(self, output_settings: OutputSettings, global_config: GlobalConfig):
         self.output_settings = output_settings
         self.global_config = global_config
+        self.digest_history_file = "history/digest_history.json"
+        
+    def _ensure_history_dir(self):
+        """Ensure the history directory exists."""
+        Path("history").mkdir(exist_ok=True)
+        
+    def load_previous_digests(self) -> List[Dict]:
+        """Load the last n digests from history."""
+        self._ensure_history_dir()
+        if not os.path.exists(self.digest_history_file):
+            return []
+            
+        try:
+            with open(self.digest_history_file, 'r', encoding='utf-8') as f:
+                all_digests = json.load(f)
+            # Return the most recent digests up to context_digest_size
+            return all_digests[-self.global_config.context_digest_size:]
+        except Exception as e:
+            print(f"Warning: Could not load digest history: {e}")
+            return []
+    
+    def save_digest_to_history(self, digest_content: str, date: datetime):
+        """Save the current digest to history, maintaining only the most recent digests."""
+        self._ensure_history_dir()
+        
+        # Load existing digests
+        all_digests = []
+        if os.path.exists(self.digest_history_file):
+            try:
+                with open(self.digest_history_file, 'r', encoding='utf-8') as f:
+                    all_digests = json.load(f)
+            except Exception as e:
+                print(f"Warning: Could not load existing digest history: {e}")
+        
+        # Add the new digest
+        new_digest = {
+            "date": date.strftime('%Y-%m-%d'),
+            "content": digest_content
+        }
+        all_digests.append(new_digest)
+        
+        # Keep only the most recent digests (double the context size to have some buffer)
+        max_stored = max(self.global_config.context_digest_size * 2, 10)
+        all_digests = all_digests[-max_stored:]
+        
+        # Save back to file
+        try:
+            with open(self.digest_history_file, 'w', encoding='utf-8') as f:
+                json.dump(all_digests, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"Warning: Could not save digest to history: {e}")
+            
+    def get_context_for_llm(self) -> str:
+        """Get formatted context from previous digests for LLM consumption."""
+        previous_digests = self.load_previous_digests()
+        if not previous_digests:
+            return ""
+            
+        context_parts = ["Here are the previous digests for context (avoid repeating similar news):"]
+        for digest in previous_digests:
+            context_parts.append(f"\n--- Digest from {digest['date']} ---")
+            context_parts.append(digest['content'])
+            
+        context_parts.append("\n--- End of previous digests ---\n")
+        return "\n".join(context_parts)
 
     def generate_markdown_digest(
         self,

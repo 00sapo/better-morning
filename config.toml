@@ -1,12 +1,12 @@
 [llm_settings]
 reasoner_model = "gemini/gemini-2.5-pro"
 light_model = "gemini/gemini-2.5-flash-lite"
-temperature = 0.5
+temperature = 1.0
 n_most_important_news = 10
 k_words_each_summary = 150
 output_language = "italian"
 thinking_effort_reasoner = 8192
-thinking_effort_light = 0
+thinking_effort_light = 2048
 prompt_template = """Riassumi il seguente articolo includendo i fatti e le opinioni chiave, in esattamente {k_words_each_summary} parole:
 
 Titolo: {title}
@@ -16,6 +16,10 @@ Riassunto in italiano:"""
 
 [content_extraction_settings]
 follow_article_links = false # this is the default
+
+# Number of previous digests used as context for article relevance decisions
+# This helps avoid repeating similar news and provides better context for relevance decisions
+context_digest_size = 4
 
 [output_settings]
 output_type = "email"         # Options: "github_release", "email" (github_release is not working)

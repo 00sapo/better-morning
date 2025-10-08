@@ -53,9 +53,13 @@ async def process_collection(
                 fetch_report,
             )
 
-        # 2. Use LLM to select which articles to fetch content for
+        # 2. Get digest context from DocumentGenerator
+        document_generator = DocumentGenerator(global_config.output_settings, global_config)
+        digest_context = document_generator.get_context_for_llm()
+        
+        # 3. Use LLM to select which articles to fetch content for
         articles_to_fetch = await llm_summarizer.select_articles_for_fetching(
-            new_articles, collection_config.collection_prompt
+            new_articles, collection_config.collection_prompt, digest_context
         )
         if not articles_to_fetch:
             print(
@@ -143,6 +147,7 @@ async def process_collection(
         ) = await llm_summarizer.summarize_articles_collection(
             articles_with_content,
             collection_prompt=collection_config.collection_prompt,
+            previous_digests_context=digest_context,
         )
 
         # Get fetch report
@@ -325,7 +330,11 @@ async def main():
             f"\n⚠️  {total_failed} feeds failed. Check the detailed report in the digest for URLs to potentially remove."
         )
 
-    # 6. Only save articles to history after digest has been successfully output
+    # 6. Save the generated digest to history for future context
+    document_generator.save_digest_to_history(final_markdown_digest, today)
+    print(f"Saved digest to history for future context")
+
+    # 7. Only save articles to history after digest has been successfully output
     # This ensures that if any step fails, no articles are marked as processed
     for collection_file in collection_files:
         collection_config = load_collection(collection_file, global_config)
