@@ -2,8 +2,6 @@
 reasoner_model = "gemini/gemini-2.5-pro"
 light_model = "gemini/gemini-2.5-flash-lite"
 temperature = 1.0
-n_most_important_news = 10
-k_words_each_summary = 150
 output_language = "italian"
 thinking_effort_reasoner = 8192
 thinking_effort_light = 2048
