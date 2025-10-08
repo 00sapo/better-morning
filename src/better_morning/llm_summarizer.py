@@ -1,7 +1,7 @@
 import asyncio
 from typing import Optional, List
 import litellm
-import os
+import datetime
 import base64
 import json
 
@@ -367,6 +367,7 @@ Articles:
 
         collection_summary_prompt = (
             f"Here are a few digests of previous news and some articles summarized. You should select the most important stories presented in the summarized articles below, avoiding previously covered stories.\n\n"
+            f"Consider that today is {datetime.datetime.now().strftime('%Y %B, %-d')}.\n\n"
             f"1. Identify the {self.settings.n_most_important_news} most important stories."
             f"2. Considering that the same story may be repeated in multitiple articles from different perspectives and with different details, write a cohesive and concise summary of those top stories. "
             f"3. The final summary must be in {self.settings.output_language}. "
