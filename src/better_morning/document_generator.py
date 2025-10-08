@@ -128,14 +128,13 @@ class DocumentGenerator:
             # Convert the Markdown body to HTML
             html_body = markdown2.markdown(body)
 
-            # Create a multipart message with 'alternative' subtype
-            msg = MIMEMultipart("alternative")
+            # Create message with HTML content
+            msg = MIMEMultipart()
             msg["From"] = smtp_username
             msg["To"] = recipient_email
             msg["Subject"] = subject
 
-            # Attach both the plain text (original markdown) and HTML parts
-            msg.attach(MIMEText(body, "plain"))
+            # Attach only the HTML part
             msg.attach(MIMEText(html_body, "html"))
 
             with smtplib.SMTP_SSL(
