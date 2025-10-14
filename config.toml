@@ -1,6 +1,6 @@
 [llm_settings]
-reasoner_model = "gemini/gemini-2.5-pro"
-light_model = "gemini/gemini-2.5-flash-lite"
+reasoner_model = "deepseek/deepseek-reasoner"
+light_model = "deepseek/deepseek-chat"
 temperature = 1.0
 output_language = "italian"
 thinking_effort_reasoner = 8192
