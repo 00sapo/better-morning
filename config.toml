@@ -1,5 +1,5 @@
 [llm_settings]
-reasoner_model = "deepseek/deepseek-reasoner"
+reasoner_model = "deepseek/deepseek-chat"
 light_model = "deepseek/deepseek-chat"
 temperature = 1.0
 output_language = "italian"
