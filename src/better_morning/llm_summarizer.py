@@ -12,6 +12,8 @@ from .rss_fetcher import Article
 # Rough estimate: 1 token = 4 characters (common for English text)
 TOKEN_TO_CHAR_RATIO = 4
 
+# Allow automatic dropping of unsupported parameters (e.g. thinking tokens and similar)
+litellm.drop_params=True
 
 class LLMSummarizer:
     def __init__(self, settings: LLMSettings, global_config: GlobalConfig):
