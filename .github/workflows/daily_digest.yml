@@ -26,13 +26,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Cache article history
-        uses: actions/cache@v4
+      - name: Restore article history cache
+        uses: actions/cache/restore@v4
         with:
           path: history/
-          key: article-history-cache
+          key: article-history-${{ github.run_number }}
           restore-keys: |
-            article-history-cache
+            article-history-
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -51,3 +51,10 @@ jobs:
       - name: Run Daily Digest Generation
         run: uv run src/main.py
         timeout-minutes: 20
+
+      - name: Save article history cache
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: history/
+          key: article-history-${{ github.run_number }}

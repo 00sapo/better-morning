@@ -158,8 +158,8 @@ class RSSFetcher:
         with open(history_file, "w") as f:
             json.dump(articles_to_save, f, cls=ArticleEncoder, indent=4)
 
-    def save_selected_articles_to_history(self, collection_name: str, selected_articles: List[Article]):
-        """Save only the selected articles to history, merging with existing historical articles."""
+    def save_selected_articles_to_history(self, collection_name: str, selected_articles: List[Article], max_days_to_keep: int = 7):
+        """Save only the selected articles to history, merging with existing historical articles and pruning old ones."""
         historical_articles = self._load_historical_articles(collection_name)
         
         # Create a dictionary of existing articles by ID
@@ -169,8 +169,25 @@ class RSSFetcher:
         for article in selected_articles:
             all_articles[article.id] = article
         
-        # Save the merged list
-        self._save_articles_to_history(collection_name, list(all_articles.values()))
+        # Prune articles older than max_days_to_keep
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=max_days_to_keep)
+        pruned_articles = []
+        
+        for article in all_articles.values():
+            article_date = article.published_date
+            # Treat naive datetime as UTC (consistent with how articles are parsed in fetch_articles)
+            if article_date.tzinfo is None:
+                article_date = article_date.replace(tzinfo=timezone.utc)
+            
+            if article_date >= cutoff_date:
+                pruned_articles.append(article)
+        
+        pruned_count = len(all_articles) - len(pruned_articles)
+        if pruned_count > 0:
+            print(f"Pruned {pruned_count} old articles from history (keeping articles from last {max_days_to_keep} days)")
+        
+        # Save the pruned list
+        self._save_articles_to_history(collection_name, pruned_articles)
 
     def _get_domain(self, url: str) -> str:
         """Extract domain from URL for rate limiting purposes."""
