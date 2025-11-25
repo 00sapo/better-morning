@@ -25,4 +25,4 @@ k_words_each_summary = 100
 [content_extraction_settings]
 collection_prompt = "Una panoramica completa ma concisa delle notizie di natura *politica* locale. Questa rassegna *esclude* tutto ciò che riguarda la cronaca nera, le feste locali, le notizie sportive e culturali, a meno che non abbiano un impatto significativo sulla politica di Pavia e/o della Lombardia. *Non include* notizie della politica nazionale o internazionale che vengono riportate da testate locali. Include i dibattiti e le dichiarazioni dei politici comunali, assessori comunali, consiglieri comunali. Include notifiche di atti e decisioni del Comune di Pavia importanti, non i semplici atti quotidiani. Particolare attenzione deve essere posta posta su *opere urbanistiche*, *architettoniche* e su progetti che impiegano un *alto valore pubblico* (es. 50.000€+)."
 follow_article_links = false
-link_filter_pattern = "https:\/\/pavia.trasparenza-valutazione-merito.it\/web\/trasparenza\/papca-ap.+"
+link_filter_pattern = "https:\\/\\/pavia\.trasparenza-valutazione-merito\.it\\/web\\/trasparenza\\/papca-ap.+"
