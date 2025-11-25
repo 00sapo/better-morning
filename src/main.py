@@ -180,6 +180,7 @@ async def main():
     print(f"Found {len(collection_files)} collections to process.")
 
     collection_results = []
+    collection_errors: Dict[str, str] = {}
     # Process collections sequentially to avoid overwhelming the LLM API
     for filepath in collection_files:
         try:
@@ -191,13 +192,15 @@ async def main():
             )
             # Create a dummy result so the aggregation logic doesn't fail
             collection_name = os.path.basename(filepath).replace(".toml", "")
+            # Track the error for reporting in the digest
+            collection_errors[collection_name] = str(e)
             collection_results.append(
                 (
                     collection_name,
                     f"[ERROR: Processing failed: {e}]",
                     [],
                     [f"Collection {collection_name} failed"],
-                    {},
+                    {"successful": [], "failed": [], "total_feeds": 0},
                 )
             )
 
@@ -229,6 +232,7 @@ async def main():
         list(skipped_sources),
         today,
         fetch_reports,
+        collection_errors or None,
     )
 
     # 5. Output the digest based on global settings
@@ -293,9 +297,13 @@ async def main():
     total_articles = 0
 
     for collection_name, report in fetch_reports.items():
-        successful_count = len(report["successful"])
-        failed_count = len(report["failed"])
-        articles_count = sum(s["articles_fetched"] for s in report["successful"])
+        # Handle missing or empty keys gracefully
+        successful_feeds = report.get("successful", [])
+        failed_feeds = report.get("failed", [])
+        
+        successful_count = len(successful_feeds)
+        failed_count = len(failed_feeds)
+        articles_count = sum(s.get("articles_fetched", 0) for s in successful_feeds)
 
         total_successful += successful_count
         total_failed += failed_count
@@ -312,9 +320,15 @@ async def main():
 
         if failed_count > 0:
             print(f"  Failed feeds in {collection_name}:")
-            for failed_feed in report["failed"]:
-                print(f"    - {failed_feed['name']}: {failed_feed['error']}")
-                print(f"      URL: {failed_feed['url']}")
+            for failed_feed in failed_feeds:
+                print(f"    - {failed_feed.get('name', 'Unknown')}: {failed_feed.get('error', 'Unknown error')}")
+                print(f"      URL: {failed_feed.get('url', 'N/A')}")
+
+    # Print collection errors if any
+    if collection_errors:
+        print("\n=== COLLECTION PROCESSING ERRORS ===")
+        for collection_name, error_msg in collection_errors.items():
+            print(f"  {collection_name}: {error_msg}")
 
     overall_success_rate = (
         total_successful / (total_successful + total_failed)
