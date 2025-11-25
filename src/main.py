@@ -362,7 +362,9 @@ async def main():
             # We save the articles that were successfully summarized to history.
             # This prevents them from being re-processed in the next run.
             rss_fetcher.save_selected_articles_to_history(
-                collection_name, articles_by_collection[collection_name]
+                collection_name,
+                articles_by_collection[collection_name],
+                global_config.history_retention_days
             )
             
             # Save the current digest timestamp for max_age="last-digest" functionality
