@@ -232,7 +232,7 @@ async def main():
         list(skipped_sources),
         today,
         fetch_reports,
-        collection_errors if collection_errors else None,
+        collection_errors or None,
     )
 
     # 5. Output the digest based on global settings
