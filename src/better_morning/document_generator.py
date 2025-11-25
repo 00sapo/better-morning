@@ -102,6 +102,7 @@ class DocumentGenerator:
         skipped_sources: List[str],
         date: datetime,
         fetch_reports: Optional[Dict[str, dict]] = None,
+        collection_errors: Optional[Dict[str, str]] = None,
     ) -> str:
         """Formats the digest with a top-level overview and detailed summaries."""
         title = f"# Daily Digest - {date.strftime('%Y-%m-%d')}"
@@ -113,6 +114,14 @@ class DocumentGenerator:
             overview_parts.append(summary)
         overview_section = "\n".join(overview_parts)
 
+        # Generate collection errors section (for collections that failed early)
+        collection_errors_section = ""
+        if collection_errors:
+            collection_errors_section = "\n## ⚠️ Collection Processing Errors\n\n"
+            collection_errors_section += "*The following collections encountered errors and could not be fully processed. Please check your configuration:*\n\n"
+            for collection_name, error_msg in collection_errors.items():
+                collection_errors_section += f"- **{collection_name}**: {error_msg}\n"
+
         # Generate feed report section
         feed_report_section = ""
         if fetch_reports:
@@ -122,14 +131,18 @@ class DocumentGenerator:
             total_feeds = 0
 
             for collection_name, report in fetch_reports.items():
+                # Defensive checks: handle missing or empty keys gracefully
+                successful_feeds = report.get("successful", [])
+                failed_feeds = report.get("failed", [])
+                
                 all_successful.extend(
-                    [(s, collection_name) for s in report["successful"]]
+                    [(s, collection_name) for s in successful_feeds]
                 )
-                all_failed.extend([(f, collection_name) for f in report["failed"]])
+                all_failed.extend([(f, collection_name) for f in failed_feeds])
                 total_articles += sum(
-                    s["articles_fetched"] for s in report["successful"]
+                    s.get("articles_fetched", 0) for s in successful_feeds
                 )
-                total_feeds += report["total_feeds"]
+                total_feeds += report.get("total_feeds", 0)
 
             success_rate = (
                 len(all_successful) / total_feeds if total_feeds > 0 else 0
@@ -175,6 +188,8 @@ class DocumentGenerator:
 
         # Assemble the final document
         final_document_parts = [title, overview_section]
+        if collection_errors_section:
+            final_document_parts.extend(["---", collection_errors_section])
         if feed_report_section:
             final_document_parts.extend(["---", feed_report_section])
         if skipped_sources_section:
