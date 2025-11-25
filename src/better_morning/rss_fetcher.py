@@ -175,6 +175,7 @@ class RSSFetcher:
         
         for article in all_articles.values():
             article_date = article.published_date
+            # Treat naive datetime as UTC (consistent with how articles are parsed in fetch_articles)
             if article_date.tzinfo is None:
                 article_date = article_date.replace(tzinfo=timezone.utc)
             
