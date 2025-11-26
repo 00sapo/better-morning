@@ -1,6 +1,6 @@
 name = "Google Scholar"
 
-max_age = "1d"
+max_age = "7d"
 
 [[feeds]]
 url = "https://kill-the-newsletter.com/feeds/u1qj9xi4h8i0ka4g2qo0.xml"
