@@ -1,6 +1,6 @@
 name = "Locale"
 
-max_age = "last-digest"
+max_age = "3d"
 
 [[feeds]]
 url = "https://laprovinciapavese.gelocal.it/rss/finegil/laprovinciapavese/feed.rss"
