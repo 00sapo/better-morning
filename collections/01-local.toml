@@ -3,14 +3,16 @@ name = "Locale"
 max_age = "3d"
 
 [[feeds]]
-url = "https://laprovinciapavese.gelocal.it/rss/finegil/laprovinciapavese/feed.rss"
-name = "La Provincia Pavese"
-max_articles = 30
+url = "https://www.corriere.it/dynamic-feed/rss/section/Milano.xml"
+name = "Corriere della Sera Milano"
+max_articles = 20
+follow_article_links = false
 
 [[feeds]]
 url = "https://www.ilgiorno.it/milano/rss"
 name = "Il Giorno Milano"
 max_articles = 20
+follow_article_links = false
 
 [[feeds]]
 url = "https://politepol.com/fd/cgDyyS2NC0Fa.xml"
@@ -18,11 +20,17 @@ name = "Albo Pretorio"
 max_articles = 40
 follow_article_links = true
 
+[[feeds]]
+url = "https://laprovinciapavese.gelocal.it/rss/finegil/laprovinciapavese/feed.rss"
+name = "La Provincia Pavese"
+max_articles = 30
+follow_article_links = false
+
 [llm_settings]
 n_most_important_news = 7
 k_words_each_summary = 100
 
 [content_extraction_settings]
-collection_prompt = "Una panoramica completa ma concisa delle notizie di natura *politica* locale. Questa rassegna *esclude* tutto ciò che riguarda la cronaca nera, le feste locali, le notizie sportive e culturali, a meno che non abbiano un impatto significativo sulla politica di Pavia e/o della Lombardia. *Non include* notizie della politica nazionale o internazionale che vengono riportate da testate locali. *Include* invece i dibattiti e le dichiarazioni dei politici comunali, assessori comunali, consiglieri comunali e tutte le politiche che riguardano urbanistica, traffico e servizi comunali. *Include* notifiche di atti e decisioni del Comune di Pavia importanti, non i semplici atti quotidiani. Particolare attenzione deve essere posta posta su *opere urbanistiche*, *architettoniche* e su progetti che impiegano un *alto valore pubblico* (es. 10.000€+)."
+collection_prompt = "Una panoramica completa ma concisa delle notizie di natura *politica* locale. Questa rassegna *esclude* tutto ciò che riguarda la cronaca nera, le notizie sportive e culturali, a meno che non abbiano un impatto significativo sulla politica di Pavia e/o della Lombardia. *Non include* notizie della politica nazionale o internazionale che vengono riportate da testate locali. *Include* invece i dibattiti e le dichiarazioni dei politici comunali, assessori comunali, consiglieri comunali e tutte le politiche che riguardano urbanistica, traffico, servizi pubblici, sanità e discussioni. *Include* notifiche di atti e decisioni del Comune di Pavia importanti, non i semplici atti quotidiani. Per quanto riguarda l'albo pretorio, l'attenzione deve essere posta posta su *opere urbanistiche*, *architettoniche* e su progetti che impiegano un *alto valore pubblico* (es. 10.000€+)."
 follow_article_links = false
 link_filter_pattern = "https:\\/\\/pavia\\.trasparenza-valutazione-merito\\.it\\/web\\/trasparenza\\/papca-ap.+"
