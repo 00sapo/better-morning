@@ -13,7 +13,8 @@ from .rss_fetcher import Article
 TOKEN_TO_CHAR_RATIO = 4
 
 # Allow automatic dropping of unsupported parameters (e.g. thinking tokens and similar)
-litellm.drop_params=True
+litellm.drop_params = True
+
 
 class LLMSummarizer:
     def __init__(self, settings: LLMSettings, global_config: GlobalConfig):
@@ -48,6 +49,13 @@ class LLMSummarizer:
         num_to_select = min(len(articles), 3 * self.settings.n_most_important_news)
         if num_to_select == 0:
             return []
+
+        # Edge case: If we need to select all or more articles than available, skip LLM call
+        if num_to_select >= len(articles):
+            print(
+                f"Selecting all {len(articles)} articles (no need for LLM selection since num_to_select={num_to_select} >= total articles={len(articles)})"
+            )
+            return articles
 
         # Prepare a numbered list of articles for the LLM prompt
         article_lines = []
