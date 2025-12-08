@@ -21,7 +21,7 @@ max_articles = 40
 follow_article_links = true
 
 [[feeds]]
-url = "https://laprovinciapavese.gelocal.it/rss/finegil/laprovinciapavese/feed.rss"
+url = "https://laprovinciapavese.gelocal.it/pavia/rss/copertina.xml"
 name = "La Provincia Pavese"
 max_articles = 30
 follow_article_links = false
