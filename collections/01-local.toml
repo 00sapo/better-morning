@@ -9,12 +9,6 @@ max_articles = 20
 follow_article_links = false
 
 [[feeds]]
-url = "https://www.ilgiorno.it/milano/rss"
-name = "Il Giorno Milano"
-max_articles = 20
-follow_article_links = false
-
-[[feeds]]
 url = "https://politepol.com/fd/cgDyyS2NC0Fa.xml"
 name = "Albo Pretorio"
 max_articles = 40
@@ -27,10 +21,10 @@ max_articles = 30
 follow_article_links = false
 
 [llm_settings]
-n_most_important_news = 7
+n_most_important_news = 10
 k_words_each_summary = 100
 
 [content_extraction_settings]
-collection_prompt = "Una panoramica completa ma concisa delle notizie di natura *politica* locale. Questa rassegna *esclude* tutto ciò che riguarda la cronaca nera, le notizie sportive e culturali, a meno che non abbiano un impatto significativo sulla politica di Pavia e/o della Lombardia. *Non include* notizie della politica nazionale o internazionale che vengono riportate da testate locali. *Include* invece i dibattiti e le dichiarazioni dei politici comunali, assessori comunali, consiglieri comunali e tutte le politiche che riguardano urbanistica, traffico, servizi pubblici, sanità e discussioni. *Include* notifiche di atti e decisioni del Comune di Pavia importanti, non i semplici atti quotidiani. Per quanto riguarda l'albo pretorio, l'attenzione deve essere posta posta su *opere urbanistiche*, *architettoniche* e su progetti che impiegano un *alto valore pubblico* (es. 10.000€+)."
+collection_prompt = "Una panoramica completa ma concisa delle notizie di natura *politica* locale, relativi al Comune di Pavia, alla Lombardia e a Milano. Questa rassegna si focalizza sui dibattiti e le dichiarazioni dei politici comunali, assessori comunali, consiglieri comunali e tutte le politiche che riguardano urbanistica, traffico, servizi pubblici, sanità, nuove costruzioni. Include atti e decisioni del Comune di Pavia importanti, ma non i semplici atti quotidiani, bensì su *opere urbanistiche*, *architettoniche* e su progetti che impiegano un *alto valore pubblico* (es. 10.000€+)."
 follow_article_links = false
 link_filter_pattern = "https:\\/\\/pavia\\.trasparenza-valutazione-merito\\.it\\/web\\/trasparenza\\/papca-ap.+"
