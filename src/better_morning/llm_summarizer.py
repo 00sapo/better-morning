@@ -17,6 +17,10 @@ TOKEN_TO_CHAR_RATIO = 4
 # Calculation: 290KB raw → ~387KB base64 → ~97K tokens
 MAX_PDF_BYTES = 290000
 
+# Estimated character overhead for collection summary prompt template
+# This accounts for the fixed prompt text that wraps the article summaries
+COLLECTION_PROMPT_OVERHEAD_CHARS = 500
+
 # Allow automatic dropping of unsupported parameters (e.g. thinking tokens and similar)
 litellm.drop_params = True
 
@@ -181,6 +185,8 @@ Articles:
 
         # Construct the message payload for litellm
         messages = []
+        use_pdf = False
+        
         if article.content_type == "application/pdf" and article.raw_content:
             # Check PDF size before processing
             pdf_size_bytes = len(article.raw_content)
@@ -199,8 +205,7 @@ Articles:
                 # Try to fall back to text content if available
                 if article.content:
                     print(f"Falling back to text content for '{article.title}'")
-                    # Fall through to text-based summarization below
-                    article.content_type = None  # Reset to trigger text-based path
+                    use_pdf = False  # Use text-based summarization instead
                 else:
                     # No text content available, set error message and return
                     article.summary = (
@@ -209,8 +214,10 @@ Articles:
                         f"[{article.feed_name or 'Source'}]({article.link})"
                     )
                     return article
+            else:
+                use_pdf = True
         
-        if article.content_type == "application/pdf" and article.raw_content:
+        if use_pdf:
             # Multimodal message for models that support it (like GPT-4o)
             print(f"Preparing multimodal summary request for PDF: {article.title}")
 
@@ -390,12 +397,12 @@ Articles:
             return "No articles with valid summaries.", []
 
         # Build concatenated summaries with token budget tracking
-        # Reserve 20-30% of token budget for model response and prompt overhead
+        # Reserve 25% of token budget for model response and prompt overhead
         effective_token_limit = int(self.global_config.token_size_threshold * 0.75)
         
         # Calculate base prompt size (context that will be added later)
         previous_digests_size = len(previous_digests_context or "")
-        base_prompt_overhead = 500  # Approximate size of collection summary prompt template
+        base_prompt_overhead = COLLECTION_PROMPT_OVERHEAD_CHARS
         
         concatenated_summaries = ""
         included_articles = []
