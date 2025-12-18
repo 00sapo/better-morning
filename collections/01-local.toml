@@ -15,7 +15,7 @@ max_articles = 20
 follow_article_links = false
 
 [[feeds]]
-url = "https://politepol.com/fd/cgDyyS2NC0Fa.xml"
+url = "https://politepaul.com/fd/cgDyyS2NC0Fa.xml"
 name = "Albo Pretorio"
 max_articles = 40
 follow_article_links = true
