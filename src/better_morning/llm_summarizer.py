@@ -12,6 +12,11 @@ from .rss_fetcher import Article
 # Rough estimate: 1 token = 4 characters (common for English text)
 TOKEN_TO_CHAR_RATIO = 4
 
+# Maximum size for individual PDF files (in bytes)
+# This ensures a single PDF won't exceed the token limit after base64 encoding
+# Calculation: 290KB raw → ~387KB base64 → ~97K tokens
+MAX_PDF_BYTES = 290000
+
 # Allow automatic dropping of unsupported parameters (e.g. thinking tokens and similar)
 litellm.drop_params = True
 
@@ -153,8 +158,11 @@ Articles:
         char_limit = token_limit * TOKEN_TO_CHAR_RATIO
 
         if len(text) > char_limit:
+            estimated_tokens = len(text) / TOKEN_TO_CHAR_RATIO
             print(
-                f"Warning: Text content exceeds token size threshold ({token_limit} tokens / {char_limit} characters). Truncating."
+                f"Warning: Text content exceeds token size threshold "
+                f"(~{int(estimated_tokens)} tokens / {len(text)} characters > limit of {token_limit} tokens / {char_limit} characters). "
+                f"Truncating to {char_limit} characters (~{token_limit} tokens)."
             )
             return text[:char_limit], True
         return text, False
@@ -173,6 +181,35 @@ Articles:
 
         # Construct the message payload for litellm
         messages = []
+        if article.content_type == "application/pdf" and article.raw_content:
+            # Check PDF size before processing
+            pdf_size_bytes = len(article.raw_content)
+            
+            # Estimate tokens after base64 encoding (base64 increases size by ~33%)
+            estimated_base64_size = pdf_size_bytes * 1.33
+            estimated_tokens = estimated_base64_size / TOKEN_TO_CHAR_RATIO
+            
+            # Check if PDF is too large to process
+            if pdf_size_bytes > MAX_PDF_BYTES:
+                print(
+                    f"Warning: PDF '{article.title}' is too large ({pdf_size_bytes} bytes, ~{int(estimated_tokens)} tokens after base64 encoding). "
+                    f"Maximum allowed: {MAX_PDF_BYTES} bytes. Attempting text content fallback."
+                )
+                
+                # Try to fall back to text content if available
+                if article.content:
+                    print(f"Falling back to text content for '{article.title}'")
+                    # Fall through to text-based summarization below
+                    article.content_type = None  # Reset to trigger text-based path
+                else:
+                    # No text content available, set error message and return
+                    article.summary = (
+                        f"[Error: PDF too large to process ({pdf_size_bytes} bytes, ~{int(estimated_tokens)} tokens). "
+                        f"No text content available for fallback.]\n\n"
+                        f"[{article.feed_name or 'Source'}]({article.link})"
+                    )
+                    return article
+        
         if article.content_type == "application/pdf" and article.raw_content:
             # Multimodal message for models that support it (like GPT-4o)
             print(f"Preparing multimodal summary request for PDF: {article.title}")
@@ -352,12 +389,44 @@ Articles:
         if not effectively_summarized_articles:
             return "No articles with valid summaries.", []
 
-        concatenated_summaries = "\n\n".join(
-            [
-                f"Title: {art.title}\nLink: {art.link}\nSummary: {art.summary}"
-                for art in effectively_summarized_articles
-            ]
-        )
+        # Build concatenated summaries with token budget tracking
+        # Reserve 20-30% of token budget for model response and prompt overhead
+        effective_token_limit = int(self.global_config.token_size_threshold * 0.75)
+        
+        # Calculate base prompt size (context that will be added later)
+        previous_digests_size = len(previous_digests_context or "")
+        base_prompt_overhead = 500  # Approximate size of collection summary prompt template
+        
+        concatenated_summaries = ""
+        included_articles = []
+        skipped_count = 0
+        
+        for art in effectively_summarized_articles:
+            article_summary = f"Title: {art.title}\nLink: {art.link}\nSummary: {art.summary}"
+            
+            # Estimate cumulative token count
+            new_size = len(concatenated_summaries) + len(article_summary) + previous_digests_size + base_prompt_overhead
+            estimated_tokens = new_size / TOKEN_TO_CHAR_RATIO
+            
+            if estimated_tokens > effective_token_limit:
+                print(
+                    f"Token budget reached (~{int(estimated_tokens)} tokens would exceed limit of {effective_token_limit}). "
+                    f"Stopping after including {len(included_articles)} articles. "
+                    f"Skipping {len(effectively_summarized_articles) - len(included_articles)} remaining articles."
+                )
+                skipped_count = len(effectively_summarized_articles) - len(included_articles)
+                break
+            
+            if concatenated_summaries:
+                concatenated_summaries += "\n\n"
+            concatenated_summaries += article_summary
+            included_articles.append(art)
+        
+        # Use included_articles instead of effectively_summarized_articles for the rest
+        effectively_summarized_articles = included_articles
+        
+        if skipped_count > 0:
+            print(f"Included {len(included_articles)} articles, skipped {skipped_count} due to token limits.")
 
         if not concatenated_summaries:
             return (
