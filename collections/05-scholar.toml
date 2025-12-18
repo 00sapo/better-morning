@@ -16,4 +16,4 @@ follow_article_links = true
 link_filter_pattern = "https:\\/\\/scholar.google.com\\/scholar_url\\?url=.+"
 parser_type = "html.parser"
 
-collection_prompt = "Una panoramica completa ma concisa degli articoli scientifici e delle ricerche presentate in questi articoli. La panoramica esclude le notifiche ricevute via email. Il destinatario è un esperto di machine-learning, musicologia, MIR e audio processing."
+collection_prompt = "Una panoramica completa ma concisa degli articoli scientifici e delle ricerche presentate in questi articoli. La panoramica esclude le notifiche ricevute via email. Il destinatario è un esperto di machine-learning, musicologia, MIR e audio processing. Per ogni articolo, menziona il journal/conferenza e tutti gli autori."
