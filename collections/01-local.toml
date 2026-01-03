@@ -21,10 +21,10 @@ max_articles = 40
 follow_article_links = true
 
 [llm_settings]
-n_most_important_news = 20
+n_most_important_news = 10
 k_words_each_summary = 75
 
 [content_extraction_settings]
-collection_prompt = "Una panoramica completa ma concisa delle notizie di natura *politica* locale, relativi al Comune di Pavia, alla Lombardia e a Milano. Questa rassegna si focalizza sui dibattiti e le dichiarazioni dei politici comunali, assessori comunali, consiglieri comunali e tutte le politiche che riguardano urbanistica, traffico, servizi pubblici, sanità, nuove costruzioni. Include atti e decisioni del Comune di Pavia importanti, ma non i semplici atti quotidiani, bensì su *opere urbanistiche*, *architettoniche* e su progetti che impiegano un *alto valore pubblico* (es. 10.000€+). Esclude fatti di cronaca nera, arresti per droga, incidenti, notizie di sport e pubblicità di eventi. Si focalizza sulla vita civica e sulla politica."
+collection_prompt = "Una panoramica completa ma concisa delle notizie di natura *politica* locale, relativi al Comune di Pavia, alla Lombardia e a Milano. Questa rassegna si focalizza sui dibattiti e le dichiarazioni dei politici comunali, assessori comunali, consiglieri comunali e tutte le politiche che riguardano urbanistica, traffico, servizi pubblici, sanità, nuove costruzioni. Include atti e decisioni del Comune di Pavia importanti, ma non i semplici atti quotidiani, bensì decisioni e discussioni su *opere urbanistiche*, *architettoniche* e su progetti che impiegano un *alto valore pubblico* (es. 10.000€+). *Esclude fatti di cronaca nera, arresti per droga, incidenti, notizie di sport e pubblicità di eventi*. Si focalizza sulla vita civica e sulla politica."
 follow_article_links = false
 link_filter_pattern = "https:\\/\\/pavia\\.trasparenza-valutazione-merito\\.it\\/web\\/trasparenza\\/papca-ap.+"
