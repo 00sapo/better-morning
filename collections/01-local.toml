@@ -8,11 +8,11 @@ name = "La Provincia Pavese"
 max_articles = 30
 follow_article_links = false
 
-[[feeds]]
-url = "https://www.corriere.it/dynamic-feed/rss/section/Milano.xml"
-name = "Corriere della Sera Milano"
-max_articles = 20
-follow_article_links = false
+# [[feeds]]
+# url = "https://www.corriere.it/dynamic-feed/rss/section/Milano.xml"
+# name = "Corriere della Sera Milano"
+# max_articles = 20
+# follow_article_links = false
 
 [[feeds]]
 url = "https://politepaul.com/fd/cgDyyS2NC0Fa.xml"
