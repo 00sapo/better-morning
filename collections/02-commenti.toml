@@ -15,7 +15,7 @@ max_articles = 2
 [[feeds]]
 url = "https://www.valigiablu.it/feed/"
 name = "Valigia Blu"
-max_articles = 2
+max_articles = 3
 
 [[feeds]]
 url = "https://www.vdnews.it/rss"
@@ -30,14 +30,14 @@ max_articles = 2
 [[feeds]]
 url = "https://jacobinitalia.it/feed/"
 name = "Jacobin Italia"
-max_articles = 2
+max_articles = 3
 
 [llm_settings]
-n_most_important_news = 3
+n_most_important_news = 5
 k_words_each_summary = 200
 
 [content_extraction_settings]
 follow_article_links = false
 parser_type = "html.parser"
 
-collection_prompt = "Una panoramica completa ma concisa delle notizie, opinioni, commenti e prospettive presentate in questi articoli."
+collection_prompt = "Una panoramica completa ma concisa delle opinioni, commenti e prospettive presentate in questi articoli."
