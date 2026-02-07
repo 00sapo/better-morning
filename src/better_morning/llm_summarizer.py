@@ -4,6 +4,7 @@ import litellm
 import datetime
 import base64
 import json
+import re
 
 from .config import LLMSettings, GlobalConfig, get_secret
 from .rss_fetcher import Article
@@ -403,3 +404,93 @@ Articles:
             final_summary or "Could not generate collection summary.",
             effectively_summarized_articles,
         )
+
+    async def filter_article(
+        self,
+        article: Article,
+        filter_query: str,
+        model_name: Optional[str] = None,
+    ) -> bool:
+        if not filter_query:
+            return True
+
+        content = article.content or article.summary or ""
+        if not content and article.raw_content:
+            content = "[PDF content attached]"
+
+        prompt_base = (
+            "You are a strict boolean filter. "
+            "Return ONLY valid JSON with a single key 'include' and a boolean value. "
+            "No extra text.\n\n"
+            f"Filter query: {filter_query}\n\n"
+            f"Title: {article.title}\n"
+            f"Link: {article.link}\n"
+            f"Content:\n{content}\n"
+        )
+
+        def _build_params(prompt: str) -> dict:
+            params = {
+                "model": model_name or self.settings.reasoner_model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0,
+                "api_key": self.settings.api_key,
+                "timeout": 120,
+                "response_format": {"type": "json_object"},
+            }
+
+            if (
+                (model_name or self.settings.reasoner_model)
+                == self.settings.reasoner_model
+                and self.settings.thinking_effort_reasoner is not None
+            ):
+                if isinstance(self.settings.thinking_effort_reasoner, int):
+                    params["thinking"] = {
+                        "type": "enabled",
+                        "budget_tokens": self.settings.thinking_effort_reasoner,
+                    }
+                else:
+                    params["reasoning_effort"] = self.settings.thinking_effort_reasoner
+
+            return params
+
+        def _parse_include(text: str) -> Optional[bool]:
+            try:
+                data = json.loads(text)
+            except json.JSONDecodeError:
+                match = re.search(r"\{.*\}", text, re.DOTALL)
+                if not match:
+                    return None
+                try:
+                    data = json.loads(match.group(0))
+                except json.JSONDecodeError:
+                    return None
+
+            include = data.get("include") if isinstance(data, dict) else None
+            if isinstance(include, bool):
+                return include
+            return None
+
+        try:
+            response = await litellm.acompletion(**_build_params(prompt_base))
+            content_text = response.choices[0].message.content
+            parsed = _parse_include(content_text or "")
+            if parsed is not None:
+                return parsed
+
+            retry_prompt = (
+                "Return ONLY JSON. No prose, no code fences. "
+                'Valid output example: {"include": true}.\n\n' + prompt_base
+            )
+            retry_response = await litellm.acompletion(**_build_params(retry_prompt))
+            retry_text = retry_response.choices[0].message.content
+            parsed = _parse_include(retry_text or "")
+            if parsed is not None:
+                return parsed
+
+            print(
+                f"Warning: Could not parse filter response for '{article.title}'. Excluding entry."
+            )
+            return False
+        except Exception as e:
+            print(f"Error during LLM filtering for '{article.title}': {e}")
+            return False

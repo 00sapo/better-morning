@@ -56,23 +56,25 @@ class ContentExtractor:
         except Exception:
             return "unknown"
 
-    async def _apply_rate_limit(self, domain: str, min_delay: float = 0.5, max_delay: float = 2.0):
+    async def _apply_rate_limit(
+        self, domain: str, min_delay: float = 0.5, max_delay: float = 2.0
+    ):
         """Apply rate limiting per domain with randomized delays."""
         current_time = time.time()
         last_access = self._domain_last_access.get(domain, 0)
-        
+
         # Calculate time since last access to this domain
         time_since_last = current_time - last_access
-        
+
         # Add random delay between min_delay and max_delay seconds
         delay = random.uniform(min_delay, max_delay)
-        
+
         # If we accessed this domain recently, wait additional time
         if time_since_last < delay:
             additional_wait = delay - time_since_last
             print(f"Rate limiting {domain}: waiting {additional_wait:.1f}s")
             await asyncio.sleep(additional_wait)
-        
+
         # Update last access time
         self._domain_last_access[domain] = time.time()
 
@@ -151,16 +153,27 @@ class ContentExtractor:
             print(f"Info: requests fetch failed for {url}: {e}.")
             return None
 
-    async def get_content(self, article: Article) -> List[Article]:
+    async def get_content(
+        self, article: Article, merge_linked_content: bool = False
+    ) -> List[Article]:
         try:
-            return await asyncio.wait_for(self._get_content_impl(article), timeout=120.0)
+            return await asyncio.wait_for(
+                self._get_content_impl(
+                    article, merge_linked_content=merge_linked_content
+                ),
+                timeout=120.0,
+            )
         except asyncio.TimeoutError:
-            print(f"Timeout processing article '{article.title}', falling back to RSS summary")
+            print(
+                f"Timeout processing article '{article.title}', falling back to RSS summary"
+            )
             article.content = article.summary or "Content unavailable due to timeout"
             article.content_type = "text/plain"
             return [article]
-    
-    async def _get_content_impl(self, article: Article) -> List[Article]:
+
+    async def _get_content_impl(
+        self, article: Article, merge_linked_content: bool
+    ) -> List[Article]:
         overall_start_time = time.time()
         # If RSS summary is long enough (≥400 words), use it without fetching the article
         if article.summary and len(article.summary.split()) >= 400:
@@ -184,7 +197,9 @@ class ContentExtractor:
         requests_start_time = time.time()
         response = await self._fetch_with_requests(str(article.link))
         requests_duration = time.time() - requests_start_time
-        print(f"TIMER: requests fetch for '{article.title}' took {requests_duration:.2f}s")
+        print(
+            f"TIMER: requests fetch for '{article.title}' took {requests_duration:.2f}s"
+        )
 
         html_content = None
         if response:
@@ -219,7 +234,7 @@ class ContentExtractor:
                 return [article]
             else:
                 html_content = response.text
-        
+
         # If requests fails or content is not PDF, fall back to Playwright for HTML
         if html_content is None:
             playwright_start_time = time.time()
@@ -232,14 +247,16 @@ class ContentExtractor:
                 if self._active_pages >= self._max_concurrent_pages:
                     print(f"Too many active pages ({self._active_pages}), waiting...")
                     await asyncio.sleep(1.0)
-                
+
                 self._active_pages += 1
                 page = await self.browser.new_page(user_agent=self.user_agent)
                 print(
                     f"Fetching content with Playwright for: {article.title} from {article.link}"
                 )
                 # Add timeout wrapper for the entire page operation
-                await asyncio.wait_for(page.goto(str(article.link), timeout=30000), timeout=45.0)
+                await asyncio.wait_for(
+                    page.goto(str(article.link), timeout=30000), timeout=45.0
+                )
                 html_content = await asyncio.wait_for(page.content(), timeout=10.0)
             except asyncio.TimeoutError:
                 print(f"Timeout fetching article with Playwright {article.link}")
@@ -256,7 +273,9 @@ class ContentExtractor:
                         print(f"Warning: Failed to close page: {e}")
                         self._active_pages = max(0, self._active_pages - 1)
             playwright_duration = time.time() - playwright_start_time
-            print(f"TIMER: Playwright fetch for '{article.title}' took {playwright_duration:.2f}s")
+            print(
+                f"TIMER: Playwright fetch for '{article.title}' took {playwright_duration:.2f}s"
+            )
 
         if not html_content:
             article.content = (
@@ -268,8 +287,10 @@ class ContentExtractor:
         trafilatura_start_time = time.time()
         main_text_content = self._extract_from_html(html_content)
         trafilatura_duration = time.time() - trafilatura_start_time
-        print(f"TIMER: Trafilatura extraction for '{article.title}' took {trafilatura_duration:.2f}s")
-        
+        print(
+            f"TIMER: Trafilatura extraction for '{article.title}' took {trafilatura_duration:.2f}s"
+        )
+
         # Set the main article content
         article.content = main_text_content or article.summary
         article.content_type = "text/plain"
@@ -284,7 +305,9 @@ class ContentExtractor:
         # If follow_article_links is False, return just the main article
         if not should_follow_links:
             overall_duration = time.time() - overall_start_time
-            print(f"TIMER: Total processing for '{article.title}' (no links) took {overall_duration:.2f}s")
+            print(
+                f"TIMER: Total processing for '{article.title}' (no links) took {overall_duration:.2f}s"
+            )
             return [article]
 
         # If follow_article_links is True, create separate articles for each followed link
@@ -323,13 +346,14 @@ class ContentExtractor:
         ]  # Limit to 30 unique links to avoid excessive requests
 
         all_articles = [article]  # Start with the main article
+        linked_texts = []
 
         for i, link in enumerate(unique_links):
             print(f"  -> Fetching sub-link: {link}")
             # Apply rate limiting for sub-links too
             sub_domain = self._get_domain(link)
             await self._apply_rate_limit(sub_domain)
-            
+
             sub_response = await self._fetch_with_requests(link)
             if sub_response:
                 sub_content_type = sub_response.headers.get("Content-Type", "").lower()
@@ -374,6 +398,9 @@ class ContentExtractor:
                         linked_article.content = sub_text_content
                         linked_article.content_type = "text/plain"
 
+                        if merge_linked_content:
+                            linked_texts.append(sub_text_content)
+
                         # Try to extract a better title from the linked page
                         sub_soup = BeautifulSoup(sub_html_content, "html.parser")
                         title_tag = sub_soup.find("title")
@@ -384,7 +411,20 @@ class ContentExtractor:
                         continue
 
                 all_articles.append(linked_article)
-        
+
+        if merge_linked_content and linked_texts:
+            merged_content = "\n\n".join([article.content or ""] + linked_texts).strip()
+            if merged_content:
+                article.content = merged_content
+                article.content_type = "text/plain"
+            overall_duration = time.time() - overall_start_time
+            print(
+                f"TIMER: Total processing for '{article.title}' (links merged) took {overall_duration:.2f}s"
+            )
+            return [article]
+
         overall_duration = time.time() - overall_start_time
-        print(f"TIMER: Total processing for '{article.title}' (with links) took {overall_duration:.2f}s")
+        print(
+            f"TIMER: Total processing for '{article.title}' (with links) took {overall_duration:.2f}s"
+        )
         return all_articles

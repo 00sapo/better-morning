@@ -45,3 +45,30 @@ url = "https://example.com/rss"
 
     with pytest.raises(ValueError):
         load_collection(str(collection_path), GlobalConfig())
+
+
+def test_filter_settings_collection_and_feed_override(tmp_path):
+    collection_path = tmp_path / "collection.toml"
+    _write_collection_toml(
+        collection_path,
+        """
+name = "Test Collection"
+
+[filter_settings]
+filter_query = "Include only policy news"
+filter_model = "openai/gpt-4o"
+
+[[feeds]]
+url = "https://example.com/rss"
+name = "Example Feed"
+filter_query = "Include only EU policy updates"
+filter_model = "openai/gpt-4o-mini"
+""",
+    )
+
+    collection = load_collection(str(collection_path), GlobalConfig())
+
+    assert collection.filter_settings.filter_query == "Include only policy news"
+    assert collection.filter_settings.filter_model == "openai/gpt-4o"
+    assert collection.feeds[0].filter_query == "Include only EU policy updates"
+    assert collection.feeds[0].filter_model == "openai/gpt-4o-mini"

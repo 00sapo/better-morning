@@ -14,9 +14,19 @@ class LLMSettings(BaseModel):
     k_words_each_summary: int = 100
     prompt_template: Optional[str] = None  # Collection-specific prompt or for filtering
     output_language: str = "english"  # Added language setting
-    thinking_effort_reasoner: Optional[Union[int, str]] = None  # Thinking effort for reasoner model (tokens or effort level)
-    thinking_effort_light: Optional[Union[int, str]] = None  # Thinking effort for light model (tokens or effort level)
+    thinking_effort_reasoner: Optional[Union[int, str]] = (
+        None  # Thinking effort for reasoner model (tokens or effort level)
+    )
+    thinking_effort_light: Optional[Union[int, str]] = (
+        None  # Thinking effort for light model (tokens or effort level)
+    )
     api_key: Optional[str] = None  # To hold the resolved API key
+
+
+# --- Filter Settings ---
+class FilterSettings(BaseModel):
+    filter_query: Optional[str] = None
+    filter_model: Optional[str] = None
 
 
 # --- Content Extraction Settings ---
@@ -45,9 +55,12 @@ class GlobalConfig(BaseModel):
     token_size_threshold: int = 128 * 1024  # 128K tokens
     max_articles_per_collection: int = 100  # Global limit for articles per collection
     content_extraction_batch_size: int = 10  # Batch size for content extraction
-    context_digest_size: int = 3  # Number of previous digests to send as context to models
+    context_digest_size: int = (
+        3  # Number of previous digests to send as context to models
+    )
     history_retention_days: int = 7  # Days to keep articles in history
     llm_settings: LLMSettings = Field(default_factory=LLMSettings)
+    filter_settings: FilterSettings = Field(default_factory=FilterSettings)
     content_extraction_settings: ContentExtractionSettings = Field(
         default_factory=ContentExtractionSettings
     )
@@ -62,25 +75,32 @@ class RSSFeed(BaseModel):
     follow_article_links: Optional[bool] = None  # Per-source link following setting
     timeout: Optional[int] = 30  # Per-feed timeout in seconds (default 30s)
     max_retries: Optional[int] = 3  # Per-feed max retry attempts (default 3)
+    filter_query: Optional[str] = None
+    filter_model: Optional[str] = None
 
 
 # --- Collection-specific overrides (for parsing TOML) ---
 class CollectionOverrides(BaseModel):
     llm_settings: Optional[LLMSettings] = None
+    filter_settings: Optional[FilterSettings] = None
     content_extraction_settings: Optional[ContentExtractionSettings] = None
     collection_prompt: Optional[str] = None  # Prompt specific to this collection
-    max_age: Optional[Union[str, None]] = None  # Maximum age for articles (e.g., "2d", "24h", "last-digest")
-    
-    @validator('max_age')
+    max_age: Optional[Union[str, None]] = (
+        None  # Maximum age for articles (e.g., "2d", "24h", "last-digest")
+    )
+
+    @validator("max_age")
     def validate_max_age(cls, v):
         if v is None:
             return v
         if v == "last-digest":
             return v
         # Validate time span format (e.g., "1h", "2d", "30m")
-        pattern = r'^(\d+)([hdm])$'
+        pattern = r"^(\d+)([hdm])$"
         if not re.match(pattern, v):
-            raise ValueError("max_age must be 'last-digest' or a time span in format like '1h', '2d', '30m'")
+            raise ValueError(
+                "max_age must be 'last-digest' or a time span in format like '1h', '2d', '30m'"
+            )
         return v
 
 
@@ -90,6 +110,7 @@ class Collection(BaseModel):
     feeds: List[RSSFeed]
     # These will hold the *resolved* settings after merging with global
     llm_settings: LLMSettings
+    filter_settings: FilterSettings
     content_extraction_settings: ContentExtractionSettings
     collection_prompt: Optional[str] = None
     max_age: Optional[str] = None  # Maximum age for articles
@@ -115,7 +136,9 @@ def load_global_config(path: str = GLOBAL_CONFIG_FILE) -> GlobalConfig:
             api_key = get_secret(config.llm_api_token_env, "Global LLM API Key")
             config.llm_settings.api_key = api_key
         except ValueError as e:
-            print(f"Warning: Could not resolve the global LLM API key. LLM calls may fail. Error: {e}")
+            print(
+                f"Warning: Could not resolve the global LLM API key. LLM calls may fail. Error: {e}"
+            )
 
         return config
     except Exception as e:
@@ -144,6 +167,7 @@ def load_collection(collection_path: str, global_config: GlobalConfig) -> Collec
         # This allows for partial override declarations without requiring all fields
         overrides = CollectionOverrides(
             llm_settings=collection_data.get("llm_settings"),
+            filter_settings=collection_data.get("filter_settings"),
             content_extraction_settings=collection_data.get(
                 "content_extraction_settings"
             ),
@@ -193,11 +217,23 @@ def load_collection(collection_path: str, global_config: GlobalConfig) -> Collec
             **resolved_content_extraction_settings_data
         )
 
+        # Merge Filter settings: collection overrides global defaults
+        resolved_filter_settings_data = FilterSettings().model_dump()
+        resolved_filter_settings_data.update(
+            global_config.filter_settings.model_dump(exclude_unset=True)
+        )
+        if overrides.filter_settings:
+            resolved_filter_settings_data.update(
+                overrides.filter_settings.model_dump(exclude_unset=True)
+            )
+        resolved_filter_settings = FilterSettings(**resolved_filter_settings_data)
+
         # Construct the final Collection object with resolved settings
         return Collection(
             name=collection_data["name"],
             feeds=[RSSFeed(**f) for f in collection_data["feeds"]],
             llm_settings=resolved_llm_settings,
+            filter_settings=resolved_filter_settings,
             content_extraction_settings=resolved_content_extraction_settings,
             collection_prompt=overrides.collection_prompt,
             max_age=overrides.max_age,

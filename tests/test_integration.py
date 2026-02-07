@@ -24,6 +24,10 @@ async def test_full_collection_processing_flow(tmp_path, monkeypatch):
 name = "Test Collection"
 max_age = "7d"
 
+[filter_settings]
+filter_query = "Include only relevant content"
+filter_model = "openai/gpt-4o"
+
 [[feeds]]
 url = "https://example.com/rss"
 name = "Test Feed"

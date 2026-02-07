@@ -41,7 +41,9 @@ async def process_collection(
         await content_extractor.start_browser()
 
         # 1. Fetch new RSS articles
-        new_articles = rss_fetcher.fetch_articles(collection_config.name, collection_config.max_age)
+        new_articles = rss_fetcher.fetch_articles(
+            collection_config.name, collection_config.max_age
+        )
         print(f"Found {len(new_articles)} new articles for {collection_config.name}.")
         if not new_articles:
             fetch_report = rss_fetcher.get_fetch_report()
@@ -53,14 +55,28 @@ async def process_collection(
                 fetch_report,
             )
 
+        # Resolve filter settings (collection defaults, overridden by feed)
+        for article in new_articles:
+            if not article.filter_query:
+                article.filter_query = collection_config.filter_settings.filter_query
+            if not article.filter_model:
+                article.filter_model = collection_config.filter_settings.filter_model
+
+        filtering_enabled = any(article.filter_query for article in new_articles)
+
         # 2. Get digest context from DocumentGenerator
-        document_generator = DocumentGenerator(global_config.output_settings, global_config)
-        digest_context = document_generator.get_context_for_llm()
-        
-        # 3. Use LLM to select which articles to fetch content for
-        articles_to_fetch = await llm_summarizer.select_articles_for_fetching(
-            new_articles, collection_config.collection_prompt, digest_context
+        document_generator = DocumentGenerator(
+            global_config.output_settings, global_config
         )
+        digest_context = document_generator.get_context_for_llm()
+
+        # 3. Use LLM to select which articles to fetch content for
+        if filtering_enabled:
+            articles_to_fetch = new_articles
+        else:
+            articles_to_fetch = await llm_summarizer.select_articles_for_fetching(
+                new_articles, collection_config.collection_prompt, digest_context
+            )
         if not articles_to_fetch:
             print(
                 f"LLM did not select any articles to fetch for '{collection_config.name}'."
@@ -87,9 +103,16 @@ async def process_collection(
                 f"Processing articles {i + 1}-{min(i + batch_size, len(articles_to_fetch))} of {len(articles_to_fetch)}"
             )
 
-            content_extraction_tasks = [
-                content_extractor.get_content(article) for article in batch
-            ]
+            content_extraction_tasks = []
+            for article in batch:
+                merge_links = bool(article.filter_query)
+                if merge_links:
+                    article.follow_article_links = True
+                content_extraction_tasks.append(
+                    content_extractor.get_content(
+                        article, merge_linked_content=merge_links
+                    )
+                )
             batch_results = await asyncio.gather(*content_extraction_tasks)
 
             # Flatten the results
@@ -126,6 +149,25 @@ async def process_collection(
                 or str(article.source_url) not in skipped_sources
             )
         ]
+
+        if filtering_enabled:
+            print(
+                f"Filtering {len(articles_with_content)} articles with LLM queries..."
+            )
+            filtered_articles = []
+            for article in articles_with_content:
+                if not article.filter_query:
+                    filtered_articles.append(article)
+                    continue
+                include = await llm_summarizer.filter_article(
+                    article,
+                    filter_query=article.filter_query,
+                    model_name=article.filter_model,
+                )
+                if include:
+                    filtered_articles.append(article)
+
+            articles_with_content = filtered_articles
 
         if not articles_with_content:
             fetch_report = rss_fetcher.get_fetch_report()
@@ -300,7 +342,7 @@ async def main():
         # Handle missing or empty keys gracefully
         successful_feeds = report.get("successful", [])
         failed_feeds = report.get("failed", [])
-        
+
         successful_count = len(successful_feeds)
         failed_count = len(failed_feeds)
         articles_count = sum(s.get("articles_fetched", 0) for s in successful_feeds)
@@ -321,7 +363,9 @@ async def main():
         if failed_count > 0:
             print(f"  Failed feeds in {collection_name}:")
             for failed_feed in failed_feeds:
-                print(f"    - {failed_feed.get('name', 'Unknown')}: {failed_feed.get('error', 'Unknown error')}")
+                print(
+                    f"    - {failed_feed.get('name', 'Unknown')}: {failed_feed.get('error', 'Unknown error')}"
+                )
                 print(f"      URL: {failed_feed.get('url', 'N/A')}")
 
     # Print collection errors if any
@@ -364,12 +408,12 @@ async def main():
             rss_fetcher.save_selected_articles_to_history(
                 collection_name,
                 articles_by_collection[collection_name],
-                global_config.history_retention_days
+                global_config.history_retention_days,
             )
-            
+
             # Save the current digest timestamp for max_age="last-digest" functionality
             rss_fetcher.save_digest_time(collection_name, today)
-            
+
             print(
                 f"Saved {len(articles_by_collection[collection_name])} articles to history for {collection_name}"
             )

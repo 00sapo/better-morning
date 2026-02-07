@@ -230,3 +230,105 @@ async def test_summarize_articles_collection():
 
     assert collection_summary == "Collection overview"
     assert len(summarized) == 2
+
+
+@pytest.mark.asyncio
+async def test_filter_article_include_true():
+    settings = LLMSettings(
+        reasoner_model="openai/gpt-4o",
+        api_key="test-key",
+    )
+    global_config = GlobalConfig()
+    summarizer = LLMSummarizer(settings, global_config)
+
+    article = Article(
+        id="test-1",
+        title="Test Article",
+        link="https://example.com/1",
+        published_date=datetime(2025, 1, 1, tzinfo=timezone.utc),
+        content="Some content",
+    )
+
+    mock_response = MagicMock()
+    mock_response.choices = [
+        MagicMock(message=MagicMock(content=json.dumps({"include": True})))
+    ]
+
+    with patch(
+        "better_morning.llm_summarizer.litellm.acompletion", return_value=mock_response
+    ):
+        include = await summarizer.filter_article(
+            article, filter_query="Include this", model_name="openai/gpt-4o"
+        )
+
+    assert include is True
+
+
+@pytest.mark.asyncio
+async def test_filter_article_retry_and_fallback_to_json_extract():
+    settings = LLMSettings(
+        reasoner_model="openai/gpt-4o",
+        api_key="test-key",
+    )
+    global_config = GlobalConfig()
+    summarizer = LLMSummarizer(settings, global_config)
+
+    article = Article(
+        id="test-1",
+        title="Test Article",
+        link="https://example.com/1",
+        published_date=datetime(2025, 1, 1, tzinfo=timezone.utc),
+        content="Some content",
+    )
+
+    first_response = MagicMock()
+    first_response.choices = [MagicMock(message=MagicMock(content="Not JSON"))]
+
+    second_response = MagicMock()
+    second_response.choices = [
+        MagicMock(message=MagicMock(content='Here is JSON: {"include": true}'))
+    ]
+
+    with patch(
+        "better_morning.llm_summarizer.litellm.acompletion",
+        side_effect=[first_response, second_response],
+    ):
+        include = await summarizer.filter_article(
+            article, filter_query="Include this", model_name="openai/gpt-4o"
+        )
+
+    assert include is True
+
+
+@pytest.mark.asyncio
+async def test_filter_article_invalid_response_excludes():
+    settings = LLMSettings(
+        reasoner_model="openai/gpt-4o",
+        api_key="test-key",
+    )
+    global_config = GlobalConfig()
+    summarizer = LLMSummarizer(settings, global_config)
+
+    article = Article(
+        id="test-1",
+        title="Test Article",
+        link="https://example.com/1",
+        published_date=datetime(2025, 1, 1, tzinfo=timezone.utc),
+        content="Some content",
+    )
+
+    first_response = MagicMock()
+    first_response.choices = [MagicMock(message=MagicMock(content="Nope"))]
+
+    second_response = MagicMock()
+    second_response.choices = [MagicMock(message=MagicMock(content="Still not JSON"))]
+
+    with patch(
+        "better_morning.llm_summarizer.litellm.acompletion",
+        side_effect=[first_response, second_response],
+    ):
+        include = await summarizer.filter_article(
+            article, filter_query="Include this", model_name="openai/gpt-4o"
+        )
+
+    assert include is False

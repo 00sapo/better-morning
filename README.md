@@ -16,6 +16,7 @@
 - **Token Management**: Automatically truncates content if it exceeds a specified token limit to prevent excessive LLM costs.
 - **Google Scholar Alerts**: Automatically retrieve articles from google scholar alerts.
 - **Article Age Filtering**: Only include recent articles using `max_age` (per collection).
+- **LLM-Based Filtering**: Optionally include/exclude entries using a boolean LLM query at collection/feed level.
 
 ## 🚀 Getting Started
 
@@ -62,6 +63,14 @@ Summary:"""
 # default is false
 follow_article_links = false
 
+[filter_settings]
+# optional LLM-based boolean filtering after full content extraction
+# if set, all entries are fetched and internal links are merged into the parent content
+# the model must return JSON like {"include": true} to keep the entry
+# when unsupported, the system retries and falls back to JSON extraction; if still invalid, it excludes
+filter_query = "Include only articles about EU AI regulation updates"
+filter_model = "openai/gpt-4o"
+
 [output_settings]
 output_type = "email"                              # Options: "github_release", "email", github_release is not working
 smtp_server = "smtp.gmail.com"                     # Required if output_type is "email"
@@ -92,6 +101,9 @@ url = "https://www.bbc.com/news/rss/newsonline_world_edition/front_page/rss.xml"
 name = "BBC World News"
 follow_article_links = false # override parent setting for this feed only
 
+filter_query = "Include only business or economy-related news"
+filter_model = "openai/gpt-4o"
+
 [llm_settings]
 n_most_important_news = 5
 k_words_each_summary = 100
@@ -101,7 +113,34 @@ prompt_template = "Summarize this news article for a general audience: {title}. 
 follow_article_links = true # if the article content contains links, this will follow them (you can enable this at the feed level only also)
 link_filter_pattern = "https:\/\/scholar.google.com\/scholar_url\?url=.+" # this is a regex pattern to filter links to follow
 
+[filter_settings]
+# collection-level defaults (feed-level overrides take precedence)
+filter_query = "Include only articles about higher-education policy or university funding"
+filter_model = "openai/gpt-4o"
+
 collection_prompt = "Provide a comprehensive but concise overview of the most significant global news from various sources."
+```
+
+### LLM-Based Filtering (Collection/Feed)
+
+You can define an LLM query that decides whether each entry should be included. When a filter query is set, every entry is fully fetched (no title-based pre-filtering), internal links are followed, and all linked content is merged into the parent article before evaluation. The model must return JSON like `{ "include": true }`. If the model does not support structured output, the system retries with a stricter JSON-only prompt and attempts to extract the first JSON block; if parsing still fails, the entry is excluded.
+
+**Precedence**: feed-level settings override collection-level settings.
+
+**Example:**
+
+```toml
+name = "Research"
+
+[filter_settings]
+filter_query = "Include only articles about EU AI regulation updates"
+filter_model = "openai/gpt-4o"
+
+[[feeds]]
+url = "https://example.com/rss.xml"
+name = "Example Feed"
+filter_query = "Include only articles about AI safety policy"
+filter_model = "openai/gpt-4o"
 ```
 
 ### Filtering Articles by Age (`max_age`)
