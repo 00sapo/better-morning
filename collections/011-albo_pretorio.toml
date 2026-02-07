@@ -1,0 +1,15 @@
+name = "Albo Pretorio"
+
+max_age = "3d"
+
+[[feeds]]
+url = "https://politepaul.com/fd/cgDyyS2NC0Fa.xml"
+name = "Albo Pretorio"
+max_articles = 40
+
+[llm_settings]
+n_most_important_news = 5
+k_words_each_summary = 75
+
+[content_extraction_settings]
+collection_prompt = "Lista di provvedimenti dell'albo pretorio del Comune di Pavia. Includi solo atti e decisioni del Comune di Pavia importanti, ma non i semplici atti quotidiani, bensì decisioni e discussioni su *opere urbanistiche*, *architettoniche* e su progetti che impiegano un *alto valore pubblico* (es. 10.000€+)."

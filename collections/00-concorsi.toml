@@ -1,0 +1,23 @@
+name = "Concorsi"
+
+max_age = "3d"
+
+[[feeds]]
+url = "https://www.urp.cnr.it/rss/concorsi-e-selezioni"
+name = "CNR - Concorsi"
+max_articles = 20
+link_filter_pattern = "https:\\/\\/www\\.urp\\.cnr\\.it\\/system\\/files?file=.+\\.pdf"
+filter_query = "Includi solo concorsi per 'Ricercatore di III livello' accessibili con laurea o dottorato in Informatica e Ingegneria Informatica"
+
+[[feeds]]
+url = "https://politepaul.com/fd/exFGY0Px1DQb.xml"
+name = "IIT - Concorsi"
+max_articles = 20
+filter_query = "Includi solo concorsi per Ricercatore accessibili con laurea o dottorato in Informatica e Ingegneria Informatica o su argomenti di informatica"
+
+[llm_settings]
+n_most_important_news = 10
+k_words_each_summary = 20
+
+[content_extraction_settings]
+collection_prompt = "L'elenco dei concorsi per ricercatore in materie informatiche, evidenziando luogo di lavoro, istituzione e tematiche di ricerca"
