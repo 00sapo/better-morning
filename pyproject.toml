@@ -11,8 +11,15 @@ dependencies = [
   "markdown2>=2.5.4",
   "playwright>=1.55.0",
   "pydantic>=2.11.9",
+  "pytest>=8.4.2",
+  "pytest-asyncio>=0.25.2",
   "python-magic>=0.4.27",
   "requests>=2.32.5",
   "toml>=0.10.2",
   "trafilatura>=2.0.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
