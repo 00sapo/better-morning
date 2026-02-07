@@ -332,3 +332,59 @@ async def test_filter_article_invalid_response_excludes():
         )
 
     assert include is False
+
+
+@pytest.mark.asyncio
+async def test_filter_article_with_pdf_content_uses_llm_response():
+    settings = LLMSettings(
+        reasoner_model="openai/gpt-4o",
+        api_key="test-key",
+    )
+    global_config = GlobalConfig()
+    summarizer = LLMSummarizer(settings, global_config)
+
+    article = Article(
+        id="test-pdf",
+        title="PDF Article",
+        link="https://example.com/1.pdf",
+        published_date=datetime(2025, 1, 1, tzinfo=timezone.utc),
+        raw_content=b"%PDF-1.4",
+        content_type="application/pdf",
+    )
+
+    mock_response = MagicMock()
+    mock_response.choices = [
+        MagicMock(message=MagicMock(content=json.dumps({"include": True})))
+    ]
+
+    with patch(
+        "better_morning.llm_summarizer.litellm.acompletion", return_value=mock_response
+    ):
+        include = await summarizer.filter_article(
+            article, filter_query="Include pdf", model_name="openai/gpt-4o"
+        )
+
+    assert include is True
+
+
+@pytest.mark.asyncio
+async def test_filter_article_empty_query_skips_llm():
+    settings = LLMSettings(
+        reasoner_model="openai/gpt-4o",
+        api_key="test-key",
+    )
+    global_config = GlobalConfig()
+    summarizer = LLMSummarizer(settings, global_config)
+
+    article = Article(
+        id="test-1",
+        title="Test Article",
+        link="https://example.com/1",
+        published_date=datetime(2025, 1, 1, tzinfo=timezone.utc),
+    )
+
+    with patch("better_morning.llm_summarizer.litellm.acompletion") as mock_llm:
+        include = await summarizer.filter_article(article, filter_query="")
+
+    assert include is True
+    assert mock_llm.called is False

@@ -1,9 +1,26 @@
 > [!IMPORTANT]
-> This repo is 90% entirely vibe-coded, including this readme. But I use it, so it should kinda work.
+> This repo is 98% vibe-coded, including this readme. But I use it, so it should kinda work.
 
 # 🌅 Better Morning
 
 **Better Morning** is an automated news digest system that fetches articles from user-defined RSS feeds, summarizes them using a Language Model (LLM) of your choice, and delivers a personalized news summary periodically (e.g. daily).
+
+I use this for:
+- **Summarize news**
+- **Stay updated about work and project calls**
+- **Receive summaries of external newsletters**
+- **Filtering noise**, such as public acts, work announcements, newsletters
+
+This tools works best when paired with automated RSS generators:
+- https://politepaul.com
+- https://morss.it
+- https://workers.cloudflare.com (for interacting with more complex pages)
+
+You may also use https://kill-the-newsletter.com for transforming newsletters into RSS parsable by
+this tool.
+
+And you may use this tool's SMTP functionality or https://blogtrottr.com/ to get the digest to your
+mailbox.
 
 ## ✨ Features
 
@@ -123,7 +140,7 @@ collection_prompt = "Provide a comprehensive but concise overview of the most si
 
 ### LLM-Based Filtering (Collection/Feed)
 
-You can define an LLM query that decides whether each entry should be included. When a filter query is set, every entry is fully fetched (no title-based pre-filtering), internal links are followed, and all linked content is merged into the parent article before evaluation. The model must return JSON like `{ "include": true }`. If the model does not support structured output, the system retries with a stricter JSON-only prompt and attempts to extract the first JSON block; if parsing still fails, the entry is excluded.
+You can define an LLM query that decides whether each entry should be included. When a filter query is set, every entry is fully fetched (no title-based pre-filtering), internal links are followed, and all linked content is merged into the parent article before evaluation. You may use LLM-based filtering on the content for each article, but it would be slow and costly. The standard way in this tool is to do LLM-based filtering using only the titles of the articles.
 
 **Precedence**: feed-level settings override collection-level settings.
 

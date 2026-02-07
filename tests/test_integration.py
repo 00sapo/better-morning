@@ -70,6 +70,105 @@ max_articles = 5
 
 
 @pytest.mark.asyncio
+async def test_filtering_flow_merges_links_and_excludes(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    collection_path = tmp_path / "test_collection.toml"
+    _write_toml(
+        collection_path,
+        """
+name = "Test Collection"
+
+[filter_settings]
+filter_query = "Include only items with keyword"
+filter_model = "openai/gpt-4o"
+
+[[feeds]]
+url = "https://example.com/rss"
+name = "Test Feed"
+max_articles = 5
+""",
+    )
+
+    global_config = GlobalConfig()
+    collection_config = load_collection(str(collection_path), global_config)
+
+    mock_feed = MagicMock()
+    mock_feed.status = 200
+    mock_feed.bozo = False
+    mock_feed.entries = []
+
+    for i in range(1, 3):
+        entry = MagicMock()
+        entry.title = f"Article {i}"
+        entry.link = f"https://example.com/{i}"
+        entry.published_parsed = (2025, 1, i, 12, 0, 0, 0, 0, 0)
+        entry.summary = f"Summary {i}"
+        entry.content = []
+        entry.get = MagicMock(
+            side_effect=lambda k, d=None, pp=entry.published_parsed: {
+                "published_parsed": pp,
+                "published": None,
+            }.get(k, d)
+        )
+        mock_feed.entries.append(entry)
+
+    from better_morning.rss_fetcher import RSSFetcher
+    from better_morning.content_extractor import ContentExtractor
+    from better_morning.llm_summarizer import LLMSummarizer
+
+    fetcher = RSSFetcher(collection_config.feeds)
+
+    with patch("better_morning.rss_fetcher.feedparser.parse", return_value=mock_feed):
+        articles = fetcher.fetch_articles(collection_config.name)
+
+    assert len(articles) == 2
+
+    extractor = ContentExtractor(collection_config.content_extraction_settings)
+
+    async def mock_get_content(article, merge_linked_content=False):
+        article.content = f"Main content {article.title}"
+        if merge_linked_content:
+            article.content += "\n\nLinked content"
+        article.content_type = "text/plain"
+        return [article]
+
+    summarizer = LLMSummarizer(collection_config.llm_settings, global_config)
+
+    first_response = MagicMock()
+    first_response.choices = [
+        MagicMock(message=MagicMock(content=json.dumps({"include": True})))
+    ]
+    second_response = MagicMock()
+    second_response.choices = [
+        MagicMock(message=MagicMock(content=json.dumps({"include": False})))
+    ]
+
+    with patch.object(extractor, "get_content", side_effect=mock_get_content):
+        with patch(
+            "better_morning.llm_summarizer.litellm.acompletion",
+            side_effect=[first_response, second_response],
+        ):
+            processed = []
+            for article in articles:
+                result = await extractor.get_content(article, merge_linked_content=True)
+                processed.extend(result)
+
+            filtered = []
+            for article in processed:
+                include = await summarizer.filter_article(
+                    article,
+                    filter_query=collection_config.filter_settings.filter_query,
+                    model_name=collection_config.filter_settings.filter_model,
+                )
+                if include:
+                    filtered.append(article)
+
+    assert len(filtered) == 1
+    assert "Linked content" in filtered[0].content
+
+
+@pytest.mark.asyncio
 async def test_error_handling_in_collection(tmp_path, monkeypatch):
     """Test that collection errors are handled gracefully"""
     monkeypatch.chdir(tmp_path)
