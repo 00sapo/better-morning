@@ -72,3 +72,33 @@ filter_model = "openai/gpt-4o-mini"
     assert collection.filter_settings.filter_model == "openai/gpt-4o"
     assert collection.feeds[0].filter_query == "Include only EU policy updates"
     assert collection.feeds[0].filter_model == "openai/gpt-4o-mini"
+
+
+def test_llm_prompt_templates_can_be_set_in_collection(tmp_path):
+    collection_path = tmp_path / "collection.toml"
+    _write_collection_toml(
+        collection_path,
+        """
+name = "Test Collection"
+
+[llm_settings]
+article_selection_prompt_template = "Select {num_to_select}"
+collection_summary_prompt_template = "Summarize {n_most_important_news}"
+filter_prompt_template = "Filter: {filter_query}"
+
+[[feeds]]
+url = "https://example.com/rss"
+""",
+    )
+
+    collection = load_collection(str(collection_path), GlobalConfig())
+
+    assert (
+        collection.llm_settings.article_selection_prompt_template
+        == "Select {num_to_select}"
+    )
+    assert (
+        collection.llm_settings.collection_summary_prompt_template
+        == "Summarize {n_most_important_news}"
+    )
+    assert collection.llm_settings.filter_prompt_template == "Filter: {filter_query}"

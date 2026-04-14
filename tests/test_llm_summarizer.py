@@ -68,6 +68,39 @@ async def test_select_articles_for_fetching_with_llm(sample_articles):
 
 
 @pytest.mark.asyncio
+async def test_select_articles_for_fetching_uses_custom_prompt_template(
+    sample_articles,
+):
+    settings = LLMSettings(
+        reasoner_model="openai/gpt-4o",
+        n_most_important_news=2,
+        article_selection_prompt_template=(
+            "CUSTOM SELECT {num_to_select} | {collection_prompt} | {articles_str}"
+        ),
+        api_key="test-key",
+    )
+    global_config = GlobalConfig()
+    summarizer = LLMSummarizer(settings, global_config)
+
+    mock_response = MagicMock()
+    mock_response.choices = [
+        MagicMock(message=MagicMock(content=json.dumps({"selected_indices": [1, 2]})))
+    ]
+
+    with patch(
+        "better_morning.llm_summarizer.litellm.acompletion", return_value=mock_response
+    ) as mocked_completion:
+        await summarizer.select_articles_for_fetching(
+            sample_articles,
+            collection_prompt="My digest",
+        )
+
+    prompt = mocked_completion.call_args.kwargs["messages"][0]["content"]
+    assert "CUSTOM SELECT" in prompt
+    assert "My digest" in prompt
+
+
+@pytest.mark.asyncio
 async def test_select_articles_fallback_on_error(sample_articles):
     """Test fallback to most recent articles when LLM fails"""
     settings = LLMSettings(
@@ -233,6 +266,64 @@ async def test_summarize_articles_collection():
 
 
 @pytest.mark.asyncio
+async def test_summarize_articles_collection_uses_custom_prompt_template():
+    settings = LLMSettings(
+        reasoner_model="openai/gpt-4o",
+        light_model="openai/gpt-3.5-turbo",
+        n_most_important_news=2,
+        k_words_each_summary=50,
+        output_language="English",
+        collection_summary_prompt_template="CUSTOM OVERVIEW {n_most_important_news} | {concatenated_summaries}",
+        api_key="test-key",
+    )
+    global_config = GlobalConfig()
+    summarizer = LLMSummarizer(settings, global_config)
+
+    articles = [
+        Article(
+            id="test-1",
+            title="Article 1",
+            link="https://example.com/1",
+            published_date=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            content="Content 1",
+            feed_name="Feed 1",
+        ),
+        Article(
+            id="test-2",
+            title="Article 2",
+            link="https://example.com/2",
+            published_date=datetime(2025, 1, 2, tzinfo=timezone.utc),
+            content="Content 2",
+            feed_name="Feed 2",
+        ),
+    ]
+
+    mock_summary_response = MagicMock()
+    mock_summary_response.choices = [
+        MagicMock(message=MagicMock(content="Individual summary"))
+    ]
+
+    mock_collection_response = MagicMock()
+    mock_collection_response.choices = [
+        MagicMock(message=MagicMock(content="Collection overview"))
+    ]
+
+    with patch(
+        "better_morning.llm_summarizer.litellm.acompletion",
+        side_effect=[
+            mock_summary_response,
+            mock_summary_response,
+            mock_collection_response,
+        ],
+    ) as mocked_completion:
+        await summarizer.summarize_articles_collection(articles)
+
+    # Third call is the collection-level prompt
+    prompt = mocked_completion.call_args_list[2].kwargs["messages"][0]["content"]
+    assert "CUSTOM OVERVIEW 2" in prompt
+
+
+@pytest.mark.asyncio
 async def test_filter_article_include_true():
     settings = LLMSettings(
         reasoner_model="openai/gpt-4o",
@@ -388,3 +479,36 @@ async def test_filter_article_empty_query_skips_llm():
 
     assert include is True
     assert mock_llm.called is False
+
+
+@pytest.mark.asyncio
+async def test_filter_article_uses_custom_prompt_template():
+    settings = LLMSettings(
+        reasoner_model="openai/gpt-4o",
+        filter_prompt_template="CUSTOM FILTER {filter_query} | {title}",
+        api_key="test-key",
+    )
+    global_config = GlobalConfig()
+    summarizer = LLMSummarizer(settings, global_config)
+
+    article = Article(
+        id="test-1",
+        title="Test Article",
+        link="https://example.com/1",
+        published_date=datetime(2025, 1, 1, tzinfo=timezone.utc),
+        content="Some content",
+    )
+
+    mock_response = MagicMock()
+    mock_response.choices = [
+        MagicMock(message=MagicMock(content=json.dumps({"include": True})))
+    ]
+
+    with patch(
+        "better_morning.llm_summarizer.litellm.acompletion", return_value=mock_response
+    ) as mocked_completion:
+        include = await summarizer.filter_article(article, filter_query="Include this")
+
+    assert include is True
+    prompt = mocked_completion.call_args.kwargs["messages"][0]["content"]
+    assert "CUSTOM FILTER Include this | Test Article" in prompt

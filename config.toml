@@ -11,6 +11,12 @@ Titolo: {title}
 Contenuto: {content}
 
 Riassunto in italiano:"""
+# Optional: customize the LLM prompts used for article selection,
+# collection overview generation, and boolean filtering.
+# Supported variables:
+# - article_selection_prompt_template: {num_to_select}, {collection_prompt}, {repeated_news_instruction}, {context_section}, {articles_str}
+# - collection_summary_prompt_template: {today}, {n_most_important_news}, {output_language}, {target_word_count}, {repeated_news_instruction}, {user_guideline}, {context_section}, {concatenated_summaries}
+# - filter_prompt_template: {filter_query}, {title}, {link}, {content}
 
 [content_extraction_settings]
 follow_article_links = false # this is the default

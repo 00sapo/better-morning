@@ -22,6 +22,56 @@ MAX_PDF_BYTES = 290000
 # This accounts for the fixed prompt text that wraps the article summaries
 COLLECTION_PROMPT_OVERHEAD_CHARS = 500
 
+DEFAULT_ARTICLE_SELECTION_PROMPT_TEMPLATE = """From the following list of articles, select the top {num_to_select} most relevant and important ones according to the impact they have in the world.
+Provide your answer as a JSON object with a single key "selected_indices" containing a list of the chosen article numbers (e.g., [1, 5, 10]).
+The selected articles will be included in a news digest summary that responds to this description: "{collection_prompt}"
+
+{repeated_news_instruction}
+----------------
+Previous digests:
+{context_section}
+
+----------------
+Articles:
+{articles_str}
+"""
+
+DEFAULT_COLLECTION_SUMMARY_PROMPT_TEMPLATE = """Here are a few digests of previous news and some articles summarized. You should select the most important stories presented in the summarized articles below, avoiding previously covered stories.
+
+Consider that today is {today}.
+
+1. Identify the {n_most_important_news} most important stories.
+2. Considering that the same story may be repeated in multitiple articles from different perspectives and with different details, write a cohesive and concise summary of those top stories.
+3. The final summary must be in {output_language}.
+4. **Crucially, for every piece of information you include, you MUST cite the source using a Markdown link like this: ([feed name](Link)).**
+5. The final summary MUST be of {target_word_count} words.
+6. Answer with only the final summary, without introductions nor conclusions.
+7. {repeated_news_instruction}
+8. Note that previous digest may had this section empy. Moreover, the importance of the news must be evaluated based on this same section of the previous digests, not based on the other sections.
+
+{user_guideline}
+
+Previous digests:
+{context_section}
+
+----------------
+Article summaries:
+
+{concatenated_summaries}
+"""
+
+DEFAULT_FILTER_PROMPT_TEMPLATE = """You are a strict boolean filter.
+Return ONLY valid JSON with a single key 'include' and a boolean value.
+No extra text.
+
+Filter query: {filter_query}
+
+Title: {title}
+Link: {link}
+Content:
+{content}
+"""
+
 # Allow automatic dropping of unsupported parameters (e.g. thinking tokens and similar)
 litellm.drop_params = True
 
@@ -96,6 +146,23 @@ Articles:
 {articles_str}
 """
 
+        repeated_news_instruction = (
+            "IMPORTANT: Avoid repeating news that was already covered in the previous digests below. Focus on new developments and different stories. If there are no truly new stories, it is better to say so rather than repeat old news."
+            if previous_digests_context
+            else ""
+        )
+        prompt = self._render_prompt_template(
+            template=self.settings.article_selection_prompt_template
+            or DEFAULT_ARTICLE_SELECTION_PROMPT_TEMPLATE,
+            default_template=DEFAULT_ARTICLE_SELECTION_PROMPT_TEMPLATE,
+            template_name="article_selection_prompt_template",
+            num_to_select=num_to_select,
+            collection_prompt=collection_prompt or "A general news digest.",
+            repeated_news_instruction=repeated_news_instruction,
+            context_section=context_section,
+            articles_str=articles_str,
+        )
+
         try:
             print(
                 f"Asking LLM to select the best {num_to_select} articles from a list of {len(articles)}..."
@@ -156,6 +223,21 @@ Articles:
             return f"{self.settings.api_key[:4]}...{self.settings.api_key[-4:]}"
         return "None"
 
+    def _render_prompt_template(
+        self,
+        template: str,
+        default_template: str,
+        template_name: str,
+        **kwargs,
+    ) -> str:
+        try:
+            return template.format(**kwargs)
+        except Exception as e:
+            print(
+                f"Warning: Could not render '{template_name}' template ({e}). Falling back to default template."
+            )
+            return default_template.format(**kwargs)
+
     def _truncate_text_to_token_limit(
         self, text: str, token_limit: int
     ) -> tuple[str, bool]:
@@ -187,22 +269,22 @@ Articles:
         # Construct the message payload for litellm
         messages = []
         use_pdf = False
-        
+
         if article.content_type == "application/pdf" and article.raw_content:
             # Check PDF size before processing
             pdf_size_bytes = len(article.raw_content)
-            
+
             # Estimate tokens after base64 encoding (base64 increases size by ~33%)
             estimated_base64_size = pdf_size_bytes * 1.33
             estimated_tokens = estimated_base64_size / TOKEN_TO_CHAR_RATIO
-            
+
             # Check if PDF is too large to process
             if pdf_size_bytes > MAX_PDF_BYTES:
                 print(
                     f"Warning: PDF '{article.title}' is too large ({pdf_size_bytes} bytes, ~{int(estimated_tokens)} tokens after base64 encoding). "
                     f"Maximum allowed: {MAX_PDF_BYTES} bytes. Attempting text content fallback."
                 )
-                
+
                 # Try to fall back to text content if available
                 if article.content:
                     print(f"Falling back to text content for '{article.title}'")
@@ -217,7 +299,7 @@ Articles:
                     return article
             else:
                 use_pdf = True
-        
+
         if use_pdf:
             # Multimodal message for models that support it (like GPT-4o)
             print(f"Preparing multimodal summary request for PDF: {article.title}")
@@ -400,41 +482,52 @@ Articles:
         # Build concatenated summaries with token budget tracking
         # Reserve 25% of token budget for model response and prompt overhead
         effective_token_limit = int(self.global_config.token_size_threshold * 0.75)
-        
+
         # Calculate base prompt size (context that will be added later)
         previous_digests_size = len(previous_digests_context or "")
         base_prompt_overhead = COLLECTION_PROMPT_OVERHEAD_CHARS
-        
+
         concatenated_summaries = ""
         included_articles = []
         skipped_count = 0
-        
+
         for art in effectively_summarized_articles:
-            article_summary = f"Title: {art.title}\nLink: {art.link}\nSummary: {art.summary}"
-            
+            article_summary = (
+                f"Title: {art.title}\nLink: {art.link}\nSummary: {art.summary}"
+            )
+
             # Estimate cumulative token count
-            new_size = len(concatenated_summaries) + len(article_summary) + previous_digests_size + base_prompt_overhead
+            new_size = (
+                len(concatenated_summaries)
+                + len(article_summary)
+                + previous_digests_size
+                + base_prompt_overhead
+            )
             estimated_tokens = new_size / TOKEN_TO_CHAR_RATIO
-            
+
             if estimated_tokens > effective_token_limit:
                 print(
                     f"Token budget reached (~{int(estimated_tokens)} tokens would exceed limit of {effective_token_limit}). "
                     f"Stopping after including {len(included_articles)} articles. "
                     f"Skipping {len(effectively_summarized_articles) - len(included_articles)} remaining articles."
                 )
-                skipped_count = len(effectively_summarized_articles) - len(included_articles)
+                skipped_count = len(effectively_summarized_articles) - len(
+                    included_articles
+                )
                 break
-            
+
             if concatenated_summaries:
                 concatenated_summaries += "\n\n"
             concatenated_summaries += article_summary
             included_articles.append(art)
-        
+
         # Use included_articles instead of effectively_summarized_articles for the rest
         effectively_summarized_articles = included_articles
-        
+
         if skipped_count > 0:
-            print(f"Included {len(included_articles)} articles, skipped {skipped_count} due to token limits.")
+            print(
+                f"Included {len(included_articles)} articles, skipped {skipped_count} due to token limits."
+            )
 
         if not concatenated_summaries:
             return (
@@ -466,6 +559,30 @@ Articles:
             f"Previous digests:\n"
             f"{context_section}\n\n----------------"
             f"Article summaries:\n\n{concatenated_summaries}"
+        )
+
+        repeated_news_instruction = (
+            "IMPORTANT: Avoid repeating news that was already covered in the previous digests below. Focus on new developments and different stories. If there are no truly new stories, it is better to say so rather than repeat old news."
+            if previous_digests_context
+            else ""
+        )
+        collection_summary_prompt = self._render_prompt_template(
+            template=self.settings.collection_summary_prompt_template
+            or DEFAULT_COLLECTION_SUMMARY_PROMPT_TEMPLATE,
+            default_template=DEFAULT_COLLECTION_SUMMARY_PROMPT_TEMPLATE,
+            template_name="collection_summary_prompt_template",
+            today=datetime.datetime.now().strftime("%Y %B, %-d"),
+            n_most_important_news=self.settings.n_most_important_news,
+            output_language=self.settings.output_language,
+            target_word_count=self.settings.k_words_each_summary
+            * min(
+                self.settings.n_most_important_news,
+                len(effectively_summarized_articles),
+            ),
+            repeated_news_instruction=repeated_news_instruction,
+            user_guideline=user_guideline,
+            context_section=context_section,
+            concatenated_summaries=concatenated_summaries,
         )
 
         final_summary = await self._summarize_text_content(
@@ -502,6 +619,16 @@ Articles:
             f"Title: {article.title}\n"
             f"Link: {article.link}\n"
             f"Content:\n{content}\n"
+        )
+        prompt_base = self._render_prompt_template(
+            template=self.settings.filter_prompt_template
+            or DEFAULT_FILTER_PROMPT_TEMPLATE,
+            default_template=DEFAULT_FILTER_PROMPT_TEMPLATE,
+            template_name="filter_prompt_template",
+            filter_query=filter_query,
+            title=article.title,
+            link=article.link,
+            content=content,
         )
 
         def _build_params(prompt: str) -> dict:

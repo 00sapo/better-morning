@@ -13,6 +13,9 @@ class LLMSettings(BaseModel):
     n_most_important_news: int = 5
     k_words_each_summary: int = 100
     prompt_template: Optional[str] = None  # Collection-specific prompt or for filtering
+    article_selection_prompt_template: Optional[str] = None
+    collection_summary_prompt_template: Optional[str] = None
+    filter_prompt_template: Optional[str] = None
     output_language: str = "english"  # Added language setting
     thinking_effort_reasoner: Optional[Union[int, str]] = (
         None  # Thinking effort for reasoner model (tokens or effort level)
