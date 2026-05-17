@@ -1,10 +1,10 @@
 name: Daily News Digest
 
-on:
-  workflow_dispatch: # Allows manual triggering
-  schedule:
-    - cron: "30 5 * * 1,2,3,4,5" # Runs in working days at 05:30 UTC (7:30 CEST)
-    - cron: "30 6 * * 0,6" # Runs on weekends at 06:30 UTC (8:30 CEST)
+#on:
+ # workflow_dispatch: # Allows manual triggering
+  #schedule:
+   # - cron: "30 5 * * 1,2,3,4,5" # Runs in working days at 05:30 UTC (7:30 CEST)
+  #  - cron: "30 6 * * 0,6" # Runs on weekends at 06:30 UTC (8:30 CEST)
     
 env:
   PYTHONUNBUFFERED: "1" # Ensure Python output is unbuffered
